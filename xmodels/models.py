@@ -4,7 +4,7 @@ import logging
 from six import with_metaclass
 from .fields import BaseField, WrappedObjectField, ValidationException, \
     Attribute, ModelField, ModelCollectionField
-from regxact.xmodels.constraints import Stores
+from .constraints import Stores
 
 from .utils import CommonEqualityMixin, MessageRecord
 

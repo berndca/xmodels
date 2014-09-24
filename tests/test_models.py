@@ -1,10 +1,10 @@
 import pytest
-from regxact.xmodels.fields import Attribute
+from xmodels.fields import Attribute
 
 from tests.definitions import HierarchicalSequenceModel, Size, \
     VendorExtensions, name_spaces
-from regxact.xmodels import CharField, Model, IntegerField, ModelField
-from regxact.xmodels.models import SequenceElement, Choice
+from xmodels import CharField, Model, IntegerField, ModelField
+from xmodels.models import SequenceElement, Choice
 
 
 class TestElementNoAttributes(object):

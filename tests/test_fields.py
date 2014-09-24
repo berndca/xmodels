@@ -4,9 +4,9 @@ import pytest
 
 from tests.definitions import HasAModelField, IsASubModel, Vector, \
     VLNVAttributes
-from regxact.xmodels import Model, ModelField, ModelCollectionField, \
+from xmodels import Model, ModelField, ModelCollectionField, \
     FieldCollectionField
-from regxact.xmodels.fields import IntegerField, BooleanField, \
+from xmodels.fields import IntegerField, BooleanField, \
     ValidationException, BaseField, CharField, RegexField, Token, Name, NCName, \
     Language, NMTOKEN, RangeField, FloatField, NonNegativeInteger, \
     PositiveInteger, NegativeInteger, EnumField, DateTimeField, DateField, \
@@ -465,7 +465,7 @@ class TestDateTimeFieldTestCase():
 
     def test_iso8601_conversion_z(self):
         import datetime
-        from regxact.xmodels.PySO8601 import Timezone
+        from xmodels.PySO8601 import Timezone
 
         dt_field = DateTimeField()
         dt_field.validate("2010-07-13T14:01:00Z")
@@ -475,7 +475,7 @@ class TestDateTimeFieldTestCase():
 
     def test_iso8601_conversion_0(self):
         import datetime
-        from regxact.xmodels.PySO8601 import Timezone
+        from xmodels.PySO8601 import Timezone
 
         dt_field = DateTimeField()
         dt_field.validate("2010-07-13T14:02:00-05:00")
@@ -485,7 +485,7 @@ class TestDateTimeFieldTestCase():
 
     def test_iso8601_conversion_1(self):
         import datetime
-        from regxact.xmodels.PySO8601 import Timezone
+        from xmodels.PySO8601 import Timezone
 
         dt_field = DateTimeField()
         dt_field.validate("2010-07-13T14:03:00+05:30")
@@ -495,7 +495,7 @@ class TestDateTimeFieldTestCase():
 
     def test_datetime_input(self):
         import datetime
-        from regxact.xmodels.PySO8601 import Timezone
+        from xmodels.PySO8601 import Timezone
 
         datetime_input = datetime.datetime(1989, 11, 9, 15,
                                            tzinfo=Timezone("+01:00"))
@@ -512,7 +512,7 @@ class TestDateFieldTestCase():
 
     def test_datetime_input(self):
         import datetime
-        from regxact.xmodels.PySO8601 import Timezone
+        from xmodels.PySO8601 import Timezone
 
         datetime_input = datetime.datetime(1989, 11, 9,
                                            tzinfo=Timezone("+01:00"))
@@ -587,7 +587,7 @@ class TestModelFieldBasic():
 
     def test_model_field_converted(self):
         import datetime
-        from regxact.xmodels.PySO8601 import Timezone
+        from xmodels.PySO8601 import Timezone
 
         field = ModelField(IsASubModel)
         instance = field.validate(dict(dt="2010-07-13T14:03:00+05:30"))

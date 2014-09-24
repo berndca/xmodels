@@ -43,7 +43,7 @@ class BaseField(CommonEqualityMixin):
         self.default = kwargs.get('default')
         self.required = kwargs.get('required', self.required)
         self.format = kwargs.get('format', self.format)
-        self._isAttribute = False
+        self.isAttribute = False
 
     def __str__(self):
         return self.__class__.__name__
@@ -65,7 +65,7 @@ class BaseField(CommonEqualityMixin):
     @property
     def is_attribute(self):
         source0 = self.source[0] if self.source else None
-        return self._isAttribute or source0 == '@'
+        return self.isAttribute or source0 == '@'
 
 
 class Attribute(BaseField):
@@ -76,7 +76,7 @@ class Attribute(BaseField):
         self.field_instance = field_instance
         self.default = self.field_instance.default
         self.messages = self.field_instance.messages
-        self._isAttribute = True
+        self.isAttribute = True
 
     def get_source(self, key):
         source = self.source or self.field_instance.source or key

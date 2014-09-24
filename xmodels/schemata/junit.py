@@ -1,7 +1,7 @@
-from regxact.xmodels import SequenceModel, CharField, AttributeModel, \
+from .. import SequenceModel, CharField, AttributeModel, \
     ModelCollectionField, FloatField, DateTimeField, IntegerField
-from regxact.xmodels.fields import Token, NonNegativeInteger, Attribute
-from regxact.xmodels.models import SequenceElement
+from ..fields import Token, NonNegativeInteger, Attribute
+from ..models import SequenceElement
 
 
 class Property(AttributeModel):

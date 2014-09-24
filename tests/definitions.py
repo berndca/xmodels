@@ -1,7 +1,7 @@
-from regxact.xmodels import CharField, FieldCollectionField, IntegerField, ModelField, \
+from xmodels import CharField, FieldCollectionField, IntegerField, ModelField, \
     FloatField, Model, DateTimeField, ModelCollectionField, AttributeModel
-from regxact.xmodels.fields import EnumField
-from regxact.xmodels.models import SequenceModel, SequenceElement, Choice
+from xmodels.fields import EnumField
+from xmodels.models import SequenceModel, SequenceElement, Choice
 
 __author__ = 'bernd'
 
