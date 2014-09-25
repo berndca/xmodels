@@ -20,7 +20,7 @@ Overview
 
 xmodels is a Python library to convert XML documents and Python dictionaries
 including collections.OrderedDict to and from instances of Python data
-structures and validates them against a schema.
+structures and validate them against a schema.
 The conversions between XML and Python dict/collections.OrderedDict are
 performed by `xmltodict <https://pypi.python.org/pypi/xmltodict>`_.
 It supports XML specific schema features like ordered sets of element type

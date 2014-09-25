@@ -36,13 +36,13 @@ class BaseField(CommonEqualityMixin):
 
     """
     required = False
-    format = None
+    serial_format = None
 
     def __init__(self, **kwargs):
         self.source = kwargs.get('source')
         self.default = kwargs.get('default')
         self.required = kwargs.get('required', self.required)
-        self.format = kwargs.get('format', self.format)
+        self.serial_format = kwargs.get('serial_format', self.serial_format)
         self.isAttribute = False
 
     def __str__(self):
@@ -54,7 +54,7 @@ class BaseField(CommonEqualityMixin):
     def get_source(self, key):
         return self.source or key
 
-    def validate(self, raw_data, **kwargs):
+    def deserialize(self, raw_data, **kwargs):
         if raw_data is None:
             if self.required:
                 raise ValidationException('Required field has no data.',
@@ -84,8 +84,8 @@ class Attribute(BaseField):
             return source
         return '@' + source
 
-    def validate(self, raw_data, **kwargs):
-        return self.field_instance.validate(raw_data, **kwargs)
+    def deserialize(self, raw_data, **kwargs):
+        return self.field_instance.deserialize(raw_data, **kwargs)
 
 
 class CharField(BaseField):
@@ -105,8 +105,8 @@ class CharField(BaseField):
         self.minLength = kwargs.get('minLength', self.minLength)
         self.maxLength = kwargs.get('maxLength', self.maxLength)
 
-    def validate(self, raw_data, **kwargs):
-        super(CharField, self).validate(raw_data)
+    def deserialize(self, raw_data, **kwargs):
+        super(CharField, self).deserialize(raw_data)
         if not isinstance(raw_data, string_types):
             raise ValidationException(self.messages['invalid'], raw_data)
         stripped = raw_data.strip() if self.strip else raw_data
@@ -131,12 +131,12 @@ class RegexField(CharField):
         self.regex = kwargs.get('regex', self.regex)
         self.messages.update(CharField.messages)
 
-    def validate(self, raw_data, **kwargs):
-        validated_string = super(RegexField, self).validate(raw_data)
+    def deserialize(self, raw_data, **kwargs):
+        deserialized_string = super(RegexField, self).deserialize(raw_data)
         regex = re.compile(self.regex)
-        if not regex.search(validated_string):
+        if not regex.search(deserialized_string):
             raise ValidationException(self.messages['no_match'], raw_data)
-        return validated_string
+        return deserialized_string
 
 
 class Token(CharField):
@@ -152,8 +152,8 @@ class Token(CharField):
         super(Token, self).__init__(**kwargs)
         self.messages.update(CharField.messages)
 
-    def validate(self, raw_data, **kwargs):
-        string_value = super(Token, self).validate(raw_data)
+    def deserialize(self, raw_data, **kwargs):
+        string_value = super(Token, self).deserialize(raw_data)
         if ' '.join(string_value.split()) != string_value.strip():
             raise ValidationException(self.messages['whitespace'], raw_data)
         return string_value
@@ -174,11 +174,11 @@ underscore (_), dash (-), and dot (.) characters. Only one colon (:) total.""",
         colons="There should only be ONE colon."
     )
 
-    def validate(self, raw_data, **kwargs):
-        validated_string = super(Name, self).validate(raw_data, **kwargs)
-        if validated_string.count(':') > 1:
+    def deserialize(self, raw_data, **kwargs):
+        deserialized_string = super(Name, self).deserialize(raw_data, **kwargs)
+        if deserialized_string.count(':') > 1:
             raise ValidationException(self.messages['colons'], raw_data)
-        return validated_string
+        return deserialized_string
 
 
 class NCName(RegexField):
@@ -218,7 +218,7 @@ class Language(RegexField):
     document. For example, x-Newspeak.  Any of these three formats may have
     additional parts, each preceded by a hyphen, which identify more countries
     or dialects. Schema processors will not verify that values of the language
-    type conform to the above rules. They will simply validate them based on
+    type conform to the above rules. They will simply deserialize them based on
     the pattern specified for this type, which says that it must consist of
     one or more parts of up to eight characters each, separated by hyphens.
     """
@@ -256,8 +256,8 @@ class RangeField(BaseField):
         self.max = kwargs.get('max', self.max)
         self.min = kwargs.get('min', self.min)
 
-    def validate(self, raw_data, **kwargs):
-        super(RangeField, self).validate(raw_data)
+    def deserialize(self, raw_data, **kwargs):
+        super(RangeField, self).deserialize(raw_data)
         if self.min is not None:
             if raw_data < self.min:
                 raise ValidationException(self.messages['tooSmall']
@@ -279,14 +279,14 @@ class IntegerField(RangeField):
         super(IntegerField, self).__init__(**kwargs)
         self.messages.update(RangeField.messages)
 
-    def validate(self, raw_data, **kwargs):
+    def deserialize(self, raw_data, **kwargs):
         """Convert the raw_data to an
         integer.
 
         """
         try:
             converted_data = int(raw_data)
-            return super(IntegerField, self).validate(converted_data)
+            return super(IntegerField, self).deserialize(converted_data)
         except ValueError:
             raise ValidationException(self.messages['invalid'], repr(raw_data))
 
@@ -313,13 +313,13 @@ class FloatField(RangeField):
         super(FloatField, self).__init__(**kwargs)
         self.messages.update(RangeField.messages)
 
-    def validate(self, raw_data, **kwargs):
+    def deserialize(self, raw_data, **kwargs):
         """Convert the raw_data to a float.
 
         """
         try:
             converted_data = float(raw_data)
-            return super(FloatField, self).validate(converted_data)
+            return super(FloatField, self).deserialize(converted_data)
         except ValueError:
             raise ValidationException(self.messages['invalid'], repr(raw_data))
 
@@ -331,12 +331,12 @@ class NonNegativeFloat(FloatField):
 class BooleanField(BaseField):
     """Field to represent a boolean"""
 
-    def validate(self, raw_data, **kwargs):
+    def deserialize(self, raw_data, **kwargs):
         """The string ``'True'`` (case insensitive) will be converted
         to ``True``, as will any positive integers.
 
         """
-        super(BooleanField, self).validate(raw_data)
+        super(BooleanField, self).deserialize(raw_data)
         if isinstance(raw_data, string_types):
             valid_data = raw_data.strip().lower() == 'true'
             raw_data.strip().lower() == 'true'
@@ -377,8 +377,8 @@ class EnumField(CharField):
         self.lookup = None
         self.lookup_lower = None
 
-    def validate(self, raw_data, **kwargs):
-        string_value = super(EnumField, self).validate(raw_data)
+    def deserialize(self, raw_data, **kwargs):
+        string_value = super(EnumField, self).deserialize(raw_data)
         if not self.lookup:
             self.lookup = {item for item in self.options}
         if not self.lookup_lower:
@@ -409,57 +409,59 @@ class DateTimeField(BaseField):
     string will be returned by :meth:`~micromodels.DateTimeField.to_serial`.
 
     """
-    def __init__(self, **kwargs):
-        super(DateTimeField, self).__init__(**kwargs)
-        self.format = kwargs.get('format')
-        self.converted = None
-        self.derived_field = kwargs.get('derived_field')
-        self.serial_format = kwargs.get('serial_format')
 
-    def validate(self, raw_data, **kwargs):
+    def deserialize(self, raw_data, **kwargs):
         """A :class:`datetime.datetime` object is returned."""
 
-        super(DateTimeField, self).validate(raw_data)
+        super(DateTimeField, self).deserialize(raw_data)
         try:
             if isinstance(raw_data, datetime.datetime):
                 valid_data = raw_data
-            elif self.format is None:
+            elif self.serial_format is None:
                 # parse as iso8601
                 valid_data = parse(raw_data)
             else:
-                valid_data = datetime.datetime.strptime(raw_data, self.format)
+                valid_data = datetime.datetime.strptime(raw_data,
+                                                        self.serial_format)
         except ParseError as e:
             raise ValidationException(e, raw_data)
-        self.converted = valid_data
-        return raw_data
+        return valid_data
 
 
-class DateField(DateTimeField):
+class DateField(BaseField):
     """Field to represent a :mod:`datetime.date`"""
 
-    def validate(self, raw_data, **kwargs):
-        super(DateField, self).validate(raw_data)
-        self.converted = self.converted.date()
-        return raw_data
+    def deserialize(self, raw_data, **kwargs):
+        super(DateField, self).deserialize(raw_data)
+        if isinstance(raw_data, datetime.date):
+            valid_data = raw_data
+        elif isinstance(raw_data, datetime.datetime):
+            valid_data = raw_data.date()
+        elif self.serial_format is None:
+            # parse as iso8601
+            valid_data = parse_time(raw_data).date()
+        else:
+            valid_data = datetime.datetime.strptime(raw_data,
+                                                    self.serial_format).date()
+        return valid_data
 
 
-class TimeField(DateTimeField):
+class TimeField(BaseField):
     """Field to represent a :mod:`datetime.time`"""
 
-    def validate(self, raw_data, **kwargs):
-        super(TimeField, self).validate(raw_data)
+    def deserialize(self, raw_data, **kwargs):
+        super(TimeField, self).deserialize(raw_data)
         if isinstance(raw_data, datetime.time):
             valid_data = raw_data
         elif isinstance(raw_data, datetime.datetime):
             valid_data = raw_data.time()
-        elif self.format is None:
+        elif self.serial_format is None:
             # parse as iso8601
             valid_data = parse_time(raw_data).time()
         else:
             valid_data = datetime.datetime.strptime(raw_data,
-                                                    self.format).time()
-        self.converted = valid_data
-        return raw_data
+                                                    self.serial_format).time()
+        return valid_data
 
 
 class WrappedObjectField(BaseField):
@@ -485,8 +487,8 @@ class WrappedObjectField(BaseField):
                 obj.populate({'#text': raw_data}, **kwargs)
         return obj
 
-    def validate(self, raw_data, **kwargs):
-        super(WrappedObjectField, self).validate(raw_data, **kwargs)
+    def deserialize(self, raw_data, **kwargs):
+        super(WrappedObjectField, self).deserialize(raw_data, **kwargs)
         if isinstance(raw_data, self._wrapped_class):
             obj = raw_data
         else:
@@ -543,9 +545,9 @@ class ModelField(WrappedObjectField):
         super(ModelField, self).__init__(wrapped_class, **kwargs)
         self._model_instance = None
 
-    def validate(self, raw_data, **kwargs):
+    def deserialize(self, raw_data, **kwargs):
         kwargs.update(instance_index=None)
-        return super(ModelField, self).validate(raw_data, **kwargs)
+        return super(ModelField, self).deserialize(raw_data, **kwargs)
 
 
 class ModelCollectionField(WrappedObjectField):
@@ -598,13 +600,13 @@ class ModelCollectionField(WrappedObjectField):
             result.append(obj)
         return result
 
-    def validate(self, raw_data, **kwargs):
+    def deserialize(self, raw_data, **kwargs):
         if not isinstance(raw_data, list):
             raw_data = [raw_data]
         result = []
         for index, item in enumerate(raw_data):
             kwargs.update(instance_index=index)
-            obj = super(ModelCollectionField, self).validate(item, **kwargs)
+            obj = super(ModelCollectionField, self).deserialize(item, **kwargs)
             result.append(obj)
         return result
 
@@ -679,8 +681,6 @@ class FieldCollectionField(BaseField):
     """
     def __init__(self, field_instance, **kwargs):
         super(FieldCollectionField, self).__init__(**kwargs)
-        self.converted = None
-        self.derived_field = kwargs.get('derived_field')
         assert isinstance(field_instance, BaseField)
         self._instance = field_instance
 
@@ -688,13 +688,10 @@ class FieldCollectionField(BaseField):
         return '%s(%s)' % (self.__class__.__name__,
                            self._instance.__class__.__name__)
 
-    def validate(self, raw_data, **kwargs):
+    def deserialize(self, raw_data, **kwargs):
         if not isinstance(raw_data, list):
             raw_data = [raw_data]
-        self.converted = []
         result = []
         for item in raw_data:
-            result.append(self._instance.validate(item))
-            if hasattr(self._instance, 'converted'):
-                self.converted.append(self._instance.converted)
+            result.append(self._instance.deserialize(item))
         return result

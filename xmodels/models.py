@@ -319,7 +319,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
             if data is not None:
                 try:
                     kwargs['path'] = self._path
-                    self._data[key] = field.validate(data, **kwargs)
+                    self._data[key] = field.deserialize(data, **kwargs)
                     if hasattr(field, 'converted'):
                         derived_field = field.derived_field \
                             if field.derived_field else key+'_derived'
