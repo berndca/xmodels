@@ -347,16 +347,17 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         return self
 
     def serialize(self, **kwargs):
+        result = {key: value for key, value in self._extra.items()}
         for key, field in self._fields.items():
             data = self._data.get(key)
             if data is not None:
                 try:
                     kwargs['path'] = self._path
-                    self._data[key] = field.serialize(data, **kwargs)
+                    result[key] = field.serialize(data, **kwargs)
                 except ValidationException as e:
                     self._errors.append(MessageRecord(field=key, msg=e.msg))
                     error(logger, e.msg, **kwargs)
-        return self
+        return result
 
     @property
     def _fields(self):

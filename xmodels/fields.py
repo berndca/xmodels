@@ -21,7 +21,7 @@ import re
 from six import string_types
 
 from .utils import CommonEqualityMixin
-from .PySO8601 import ParseError, parse, parse_time
+from .PySO8601 import ParseError, parse, parse_time, parse_date
 
 
 logger = logging.getLogger(__name__)
@@ -382,7 +382,7 @@ class FloatField(RangeField):
 
     messages = dict(
         invalid="Could not convert to float:",
-        format="Could not convert float to string with format {%(format)s}.",
+        format="Could not convert float to string with format %(format)s.",
     )
 
     def __init__(self, **kwargs):
@@ -401,17 +401,18 @@ class FloatField(RangeField):
             raise ValidationException(self.messages['invalid'], repr(raw_data))
 
     def deserialize(self, raw_data, **kwargs):
-        super(FloatField, self).deserialize(raw_data, **kwargs)
-        return float(raw_data)
+        valid_data = super(FloatField, self).deserialize(raw_data, **kwargs)
+        return float(valid_data)
 
     def serialize(self, py_data, **kwargs):
         super(FloatField, self).serialize(py_data, **kwargs)
         if self.serial_format:
             try:
-                return "{%s}".format(py_data)
+                return self.serial_format.format(py_data)
             except (KeyError, ValueError):
-                msg = self.messages['format'] % self.serial_format
+                msg = self.messages['format'] % dict(format=self.serial_format)
                 raise ValidationException(msg, py_data)
+        return str(py_data)
 
 
 class NonNegativeFloat(FloatField):
@@ -522,6 +523,9 @@ class DateTimeField(BaseField):
     string will be returned by :meth:`~micromodels.DateTimeField.to_serial`.
 
     """
+    messages = dict(
+        parse='%(cls)s Error Parsing %(data)s with format %(format)s'
+    )
 
     def __init__(self, **kwargs):
         super(DateTimeField, self).__init__(**kwargs)
@@ -541,8 +545,11 @@ class DateTimeField(BaseField):
                 self.converted = datetime.datetime.strptime(raw_data,
                                                             self.serial_format)
             return raw_data
-        except ParseError as e:
-            raise ValidationException(e, raw_data)
+        except (ParseError, ValueError) as e:
+            msg = self.messages['parse'] % dict(cls=self.__class__.__name__,
+                                                data=raw_data,
+                                                format=self.serial_format)
+            raise ValidationException(msg, raw_data)
 
     def deserialize(self, raw_data, **kwargs):
         """A :class:`datetime.datetime` object is returned."""
@@ -550,10 +557,7 @@ class DateTimeField(BaseField):
         return self.converted
 
     def serialize(self, py_data, **kwargs):
-        if not isinstance(py_data, datetime.datetime):
-            time_obj = self.validate(py_data, **kwargs)
-        else:
-            time_obj = py_data
+        time_obj = self.deserialize(py_data, **kwargs)
         if not self.serial_format:
             return time_obj.isoformat()
         return time_obj.strftime(self.serial_format)
@@ -563,34 +567,35 @@ class DateField(DateTimeField):
     """Field to represent a :mod:`datetime.date`"""
 
     def validate(self, raw_data, **kwargs):
-        super(DateField, self).validate(raw_data)
         try:
-            if isinstance(raw_data, datetime.date):
-                valid_data = raw_data
-            elif isinstance(raw_data, datetime.datetime):
+            if isinstance(raw_data, datetime.datetime):
                 valid_data = raw_data.date()
+            elif isinstance(raw_data, datetime.date):
+                valid_data = raw_data
             elif self.serial_format is None:
                 # parse as iso8601
-                valid_data = parse_time(raw_data).date()
+                valid_data = parse_date(raw_data).date()
             else:
                 valid_data = datetime.datetime.strptime(
                     raw_data, self.serial_format).date()
             self.converted = valid_data
             return raw_data
-        except ParseError as e:
-            raise ValidationException(e, raw_data)
+        except (ParseError, ValueError) as e:
+            msg = self.messages['parse'] % dict(cls=self.__class__.__name__,
+                                                data=raw_data,
+                                                format=self.serial_format)
+            raise ValidationException(msg, raw_data)
 
 
 class TimeField(DateTimeField):
     """Field to represent a :mod:`datetime.time`"""
 
     def validate(self, raw_data, **kwargs):
-        super(TimeField, self).validate(raw_data, **kwargs)
         try:
-            if isinstance(raw_data, datetime.time):
-                valid_data = raw_data
-            elif isinstance(raw_data, datetime.datetime):
+            if isinstance(raw_data, datetime.datetime):
                 valid_data = raw_data.time()
+            elif isinstance(raw_data, datetime.time):
+                valid_data = raw_data
             elif self.serial_format is None:
                 # parse as iso8601
                 valid_data = parse_time(raw_data).time()
@@ -599,8 +604,11 @@ class TimeField(DateTimeField):
                     raw_data, self.serial_format).time()
             self.converted = valid_data
             return raw_data
-        except ParseError as e:
-            raise ValidationException(e, raw_data)
+        except (ParseError, ValueError) as e:
+            msg = self.messages['parse'] % dict(cls=self.__class__.__name__,
+                                                data=raw_data,
+                                                format=self.serial_format)
+            raise ValidationException(msg, raw_data)
 
 
 class WrappedObjectField(BaseField):
@@ -608,7 +616,6 @@ class WrappedObjectField(BaseField):
 
     def __init__(self, wrapped_class, **kwargs):
         self._wrapped_class = wrapped_class
-        self._related_obj = None
         super(WrappedObjectField, self).__init__(**kwargs)
 
     def __str__(self):
@@ -628,14 +635,7 @@ class WrappedObjectField(BaseField):
 
     def validate(self, raw_data, **kwargs):
         super(WrappedObjectField, self).validate(raw_data, **kwargs)
-        if isinstance(raw_data, self._wrapped_class):
-            obj = raw_data
-        else:
-            obj = self._wrapped_class()
-            if isinstance(raw_data, (dict, OrderedDict)):
-                obj.populate(raw_data, **kwargs)
-            else:
-                obj.populate({'#text': raw_data}, **kwargs)
+        obj = self.populate(raw_data, **kwargs)
         obj.validate(**kwargs)
         return obj
 
@@ -644,8 +644,7 @@ class WrappedObjectField(BaseField):
         return obj.deserialize(**kwargs)
 
     def serialize(self, py_data, **kwargs):
-        obj = super(WrappedObjectField, self).serialize(py_data, **kwargs)
-        return obj.serialize(**kwargs)
+        return py_data.serialize(**kwargs)
 
     @property
     def name_space(self):
@@ -748,21 +747,20 @@ class ModelCollectionField(WrappedObjectField):
         return result
 
     def validate(self, raw_data, **kwargs):
-        if not isinstance(raw_data, list):
-            raw_data = [raw_data]
+        objects = self.populate(raw_data, **kwargs)
         result = []
-        for index, item in enumerate(raw_data):
+        for index, item in enumerate(objects):
             kwargs.update(instance_index=index)
-            obj = super(ModelCollectionField, self).validate(item, **kwargs)
-            result.append(obj)
+            item.validate(**kwargs)
+            result.append(item)
         return result
 
     def deserialize(self, raw_data, **kwargs):
         objects = self.validate(raw_data, **kwargs)
         return [obj.deserialize(**kwargs) for obj in objects]
 
-    def serialize(self, raw_data, **kwargs):
-        objects = self.validate(raw_data, **kwargs)
+    def serialize(self, py_data, **kwargs):
+        objects = self.validate(py_data, **kwargs)
         return [obj.serialize(**kwargs) for obj in objects]
 
 
@@ -853,10 +851,9 @@ class FieldCollectionField(BaseField):
         return result
 
     def deserialize(self, raw_data, **kwargs):
-        if not isinstance(raw_data, list):
-            raw_data = [raw_data]
+        items = self.validate(raw_data, **kwargs)
         result = []
-        for item in raw_data:
+        for item in items:
             result.append(self._instance.deserialize(item))
         return result
 
