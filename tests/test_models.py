@@ -27,7 +27,7 @@ class TestElementNoAttributes(object):
         }
         cls.instance = Register()
         cls.instance.populate(register_dict)
-        cls.instance.to_python()
+        cls.instance.validate()
 
     def test_address_offset(self):
         assert self.instance.addressOffset == 0
@@ -73,7 +73,7 @@ class TestElementWithAttributes(object):
         }
         cls.instance = Register()
         cls.instance.populate(register_dict)
-        cls.instance.to_python()
+        cls.instance.validate()
 
     def test_size_property(self):
         assert self.instance.size.size_int == 32
@@ -102,7 +102,7 @@ class TestHierarchicalClass(object):
     def test_from_dict(self):
         d = dict(type='my_type', child=dict(name='little one', age='4'))
         self.instance.populate(d)
-        self.instance.to_python()
+        self.instance.validate()
         assert self.instance.child.name == 'little one'
         assert self.instance.child.age == 4
         assert self.instance.type == 'my_type'
@@ -333,7 +333,7 @@ class TestNameSpacePrefix():
                            u'spirit:vector': {u'spirit:left': u'3',
                                               u'spirit:right': u'0'}}]}}}
         cls.inst = VendorExtensions.from_dict(d, name_spaces=name_spaces)
-        cls.inst.to_python(name_spaces=name_spaces)
+        cls.inst.validate(name_spaces=name_spaces)
 
     def test_isolation(self):
         assert self.inst.wire.wirePowerDefs.wirePowerDef[0].isolation == 'L'

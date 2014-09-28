@@ -591,6 +591,7 @@ class TestModelFieldBasic():
 
         field = ModelField(IsASubModel)
         instance = field.deserialize(dict(dt="2010-07-13T14:03:00+05:30"))
+
         assert instance.dt == datetime.datetime(
             2010, 7, 13, 14, 3, 0, tzinfo=Timezone("05:30"))
 
@@ -680,7 +681,10 @@ class TestModelCollectionField():
         instance = HasAModelCollectionField.from_dict(data)
         assert instance.first == []
 
-    def test_model_collection_to_dict(self):
+
+class TestModelCollectionFieldFromDict():
+    @classmethod
+    def setup_class(cls):
         class Post(Model):
             title = CharField()
             created = DateTimeField()
@@ -700,12 +704,21 @@ class TestModelCollectionField():
             ]
         }
 
-        eric = User.from_dict(data)
-        assert len(eric.posts) == 2
-        assert eric.posts[1].title == 'Post #2'
-        assert eric.posts[0].title == 'Post #1'
+        cls.eric = User.from_dict(data)
+        cls.eric.deserialize()
+
+    def test_len_posts(self):
+        assert len(self.eric.posts) == 2
+
+    def test_title_1(self):
+        assert self.eric.posts[1].title == 'Post #2'
+
+    def test_title_0(self):
+        assert self.eric.posts[0].title == 'Post #1'
+
+    def test_created_1(self):
         expected = datetime.datetime(2010, 7, 13, 14, 3)
-        assert eric.posts[1].created == expected
+        assert self.eric.posts[1].created == expected
 
 class TestFieldCollectionFieldBasic():
 

@@ -160,14 +160,14 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
 
     First, the model checks if it has a field with a name matching the key.
 
-    If there is a matching field, then :meth:`to_python` is called on the field
+    If there is a matching field, then :meth:`validate` is called on the field
     with the value.
-        If :meth:`to_python` does not raise an exception, then the result of
-        :meth:`to_python` is set on the instance, and the method is completed.
+        If :meth:`validate` does not raise an exception, then the result of
+        :meth:`validate` is set on the instance, and the method is completed.
         Essentially, this means that the first thing setting an attribute tries
         to do is process the data as if it was a "primitive" data type.
 
-        If :meth:`to_python` does raise an exception, this means that the data
+        If :meth:`validate` does raise an exception, this means that the data
         might already be an appropriate Python type. The :class:`Model` then
         attempts to *serialize* the data into a "primitive" type using the
         field's :meth:`to_serial` method.
@@ -255,7 +255,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         instance = cls()
         # cls._extract_name_spaces(kwargs, raw_data)
         instance.populate(raw_data, **kwargs)
-        instance.to_python(**kwargs)
+        instance.validate(**kwargs)
         return instance
 
     def _gen_key_to_from_source(self, name_spaces):
@@ -316,14 +316,14 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
             else:
                 self._extra[name] = value
 
-    def to_python(self, **kwargs):
+    def validate(self, **kwargs):
         self._path = self._build_path(**kwargs)
         for key, field in self._fields.items():
             data = self._data.get(key)
             if data is not None:
                 try:
                     kwargs['path'] = self._path
-                    self._data[key] = field.deserialize(data, **kwargs)
+                    self._data[key] = field.validate(data, **kwargs)
                 except ValidationException as e:
                     self._errors.append(MessageRecord(field=key, msg=e.msg))
                     error(logger, e.msg, **kwargs)
@@ -334,6 +334,30 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
             error(logger, msg, **kwargs)
         return self
 
+    def deserialize(self, **kwargs):
+        for key, field in self._fields.items():
+            data = self._data.get(key)
+            if data is not None:
+                try:
+                    kwargs['path'] = self._path
+                    self._data[key] = field.deserialize(data, **kwargs)
+                except ValidationException as e:
+                    self._errors.append(MessageRecord(field=key, msg=e.msg))
+                    error(logger, e.msg, **kwargs)
+        return self
+
+    def serialize(self, **kwargs):
+        for key, field in self._fields.items():
+            data = self._data.get(key)
+            if data is not None:
+                try:
+                    kwargs['path'] = self._path
+                    self._data[key] = field.serialize(data, **kwargs)
+                except ValidationException as e:
+                    self._errors.append(MessageRecord(field=key, msg=e.msg))
+                    error(logger, e.msg, **kwargs)
+        return self
+
     @property
     def _fields(self):
         return dict(self._clsfields, **self._extra)
@@ -342,7 +366,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         return self._data.items()
 
     def to_dict(self, name_spaces=None, **kwargs):
-        self.to_python(**kwargs)
+        self.validate(**kwargs)
         result = OrderedDict()
         self._gen_key_to_from_source(name_spaces)
         for key, value in self._get_fields_items():
@@ -399,12 +423,12 @@ class SequenceModel(Model):
         super(SequenceModel, self).__init__()
         self._data_sequence = None
 
-    def to_python(self, **kwargs):
+    def validate(self, **kwargs):
         self._path = self._build_path(**kwargs)
         if self._initial is not None:
             stores = kwargs.get('stores', Stores())
             self._initial.add_keys(path=self._path, stores=stores)
-        super(SequenceModel, self).to_python(**kwargs)
+        super(SequenceModel, self).validate(**kwargs)
         element_tags = []
         for tag in self._non_empty_fields:
             if tag in self._fields and self._data[tag] is not None:

@@ -80,7 +80,8 @@ class BaseField(CommonEqualityMixin):
         :type raw_data: str or other valid formats
         :param bool kwargs['required']: indicates required field
         :param str kwargs['default']: default value, used when raw_data is None
-        :param str kwargs['serial_format']: format string for serialization and deserialization
+        :param str kwargs['serial_format']: format string for serialization and
+        deserialization
         :param str kwargs['source']: field name for serialized version
         :returns: validated_data
         :raises ValidationException: if self.required and raw_data is None
@@ -550,7 +551,7 @@ class DateTimeField(BaseField):
 
     def serialize(self, py_data, **kwargs):
         if not isinstance(py_data, datetime.datetime):
-            time_obj = self.deserialize(py_data, **kwargs)
+            time_obj = self.validate(py_data, **kwargs)
         else:
             time_obj = py_data
         if not self.serial_format:
@@ -635,8 +636,16 @@ class WrappedObjectField(BaseField):
                 obj.populate(raw_data, **kwargs)
             else:
                 obj.populate({'#text': raw_data}, **kwargs)
-        obj.to_python(**kwargs)
+        obj.validate(**kwargs)
         return obj
+
+    def deserialize(self, raw_data, **kwargs):
+        obj = super(WrappedObjectField, self).deserialize(raw_data, **kwargs)
+        return obj.deserialize(**kwargs)
+
+    def serialize(self, py_data, **kwargs):
+        obj = super(WrappedObjectField, self).serialize(py_data, **kwargs)
+        return obj.serialize(**kwargs)
 
     @property
     def name_space(self):
@@ -747,6 +756,14 @@ class ModelCollectionField(WrappedObjectField):
             obj = super(ModelCollectionField, self).validate(item, **kwargs)
             result.append(obj)
         return result
+
+    def deserialize(self, raw_data, **kwargs):
+        objects = self.validate(raw_data, **kwargs)
+        return [obj.deserialize(**kwargs) for obj in objects]
+
+    def serialize(self, raw_data, **kwargs):
+        objects = self.validate(raw_data, **kwargs)
+        return [obj.serialize(**kwargs) for obj in objects]
 
 
 class FieldCollectionField(BaseField):
