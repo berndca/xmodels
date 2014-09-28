@@ -1,6 +1,6 @@
 from xmodels import CharField, FieldCollectionField, IntegerField, ModelField, \
     FloatField, Model, DateTimeField, ModelCollectionField, AttributeModel
-from xmodels.fields import EnumField
+from xmodels.fields import EnumField, RequiredAttribute
 from xmodels.models import SequenceModel, SequenceElement, Choice
 
 __author__ = 'bernd'
@@ -8,7 +8,7 @@ __author__ = 'bernd'
 
 class IsASubModel(Model):
     first = IntegerField(default=0)
-    dt = DateTimeField(derived_field='dt_dt')
+    dt = DateTimeField()
 
 class HasAModelField(Model):
     first = ModelField(IsASubModel)
@@ -18,8 +18,7 @@ class HasAModelField(Model):
 class ChildModel(SequenceModel):
     name = CharField()
     id = CharField(source='@id')
-    alignment = EnumField(source='@alignment', required='True',
-                          options=['serial', 'parallel'])
+    alignment = RequiredAttribute(EnumField(options=['serial', 'parallel']))
     tags = FieldCollectionField(CharField())
 
     _sequence = [
@@ -29,20 +28,21 @@ class ChildModel(SequenceModel):
 
 
 class VLNVAttributes(AttributeModel):
-    vendor = CharField(required=True)
-    library = CharField(required=True)
-    name = CharField(required=True)
-    version = CharField(required=True)
+    vendor = CharField()
+    library = CharField()
+    name = CharField()
+    version = CharField()
+    required_attributes = ['vendor', 'library', 'name', 'version']
 
 
 class LoadConstraint(AttributeModel):
-    value = CharField(required=True)
+    value = CharField()
     count = IntegerField(min=0, default=3)
 
 
 class Size(AttributeModel):
     _value_key = 'size_int'
-    size_int = IntegerField(required=True)
+    size_int = IntegerField()
     format = CharField()
     resolve = CharField(default='resolve')
 

@@ -10,7 +10,7 @@ from xmodels.fields import IntegerField, BooleanField, \
     ValidationException, BaseField, CharField, RegexField, Token, Name, NCName, \
     Language, NMTOKEN, RangeField, FloatField, NonNegativeInteger, \
     PositiveInteger, NegativeInteger, EnumField, DateTimeField, DateField, \
-    TimeField, Attribute
+    TimeField, OptionalAttribute, RequiredAttribute
 
 
 __author__ = 'bernd'
@@ -24,39 +24,39 @@ def test_validation_exception():
 class TestBaseField():
     @classmethod
     def setup_class(cls):
-        class TestBF(BaseField):
+        class TestBF(RequiredAttribute):
             required = True
 
         cls.cls = TestBF
 
     def test_base_field_str_no_data(self):
-        test = self.cls()
+        test = self.cls(CharField())
         assert str(test) == 'TestBF'
 
     def test_base_field_required_fail(self):
-        test = self.cls(required=True)
+        test = self.cls(CharField())
         with pytest.raises(ValidationException):
             test.deserialize(None)
 
     def test_deserialize(self):
-        actual = self.cls().deserialize('expected')
+        actual = self.cls(CharField()).deserialize('expected')
         assert actual == 'expected'
 
     def test_eq(self):
-        inst1 = self.cls()
-        inst2 = self.cls()
+        inst1 = self.cls(CharField())
+        inst2 = self.cls(CharField())
         assert inst1 == inst2
 
     def test_ne(self):
-        inst1 = self.cls()
-        inst2 = self.cls(required=False)
+        inst1 = RequiredAttribute(CharField())
+        inst2 = OptionalAttribute(CharField())
         assert inst1 != inst2
 
 
 class TestAttribute():
     @classmethod
     def setup_class(cls):
-        cls.instance = Attribute(IntegerField())
+        cls.instance = OptionalAttribute(IntegerField())
 
     def test_source_from_key(self):
         source = self.instance.get_source('key')
@@ -82,7 +82,7 @@ class TestAttribute():
         assert exc_info.value.msg == self.instance.messages['invalid']
 
     def test_is_attribute(self):
-        assert self.instance.is_attribute
+        assert self.instance.isAttribute
 
 
 class TestCharField():
@@ -110,7 +110,7 @@ class TestCharField():
         assert actual == 'valid'
 
     def test_is_attribute(self):
-        assert not self.instance.is_attribute
+        assert not self.instance.isAttribute
 
 
 class TestToken():

@@ -30,7 +30,7 @@ It supports XML specific schema features like ordered sets of element type
 
 .. doctest::
 
-    >>> from regxact.xmodels import Model
+    >>> from xmodels import Model
     >>> print('pass')
     pass
 

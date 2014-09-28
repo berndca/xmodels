@@ -3,7 +3,7 @@ import logging
 
 from six import with_metaclass
 from .fields import BaseField, WrappedObjectField, ValidationException, \
-    Attribute, ModelField, ModelCollectionField
+    OptionalAttribute, RequiredAttribute
 from .constraints import Stores
 
 from .utils import CommonEqualityMixin, MessageRecord
@@ -226,15 +226,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
             raise AttributeError
 
     @classmethod
-    def from_dict(cls, raw_data, **kwargs):
-        """
-        This factory for :class:`Model`
-        takes either a native Python dictionary or a JSON dictionary/object
-        if ``is_json`` is ``True``. The dictionary passed does not need to
-        contain all of the values that the Model declares.
-
-        """
-        instance = cls()
+    def _extract_name_spaces(cls, kwargs, raw_data):
         name_spaces = kwargs.get('name_spaces', {})
         keys_to_delete = []
         for key, value in raw_data.items():
@@ -250,6 +242,18 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
             del raw_data[key]
         kwargs['errors'] = []
         kwargs['name_spaces'] = name_spaces
+
+    @classmethod
+    def from_dict(cls, raw_data, **kwargs):
+        """
+        This factory for :class:`Model`
+        takes either a native Python dictionary or a JSON dictionary/object
+        if ``is_json`` is ``True``. The dictionary passed does not need to
+        contain all of the values that the Model declares.
+
+        """
+        instance = cls()
+        # cls._extract_name_spaces(kwargs, raw_data)
         instance.populate(raw_data, **kwargs)
         instance.to_python(**kwargs)
         return instance
@@ -320,10 +324,6 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                 try:
                     kwargs['path'] = self._path
                     self._data[key] = field.deserialize(data, **kwargs)
-                    if hasattr(field, 'converted'):
-                        derived_field = field.derived_field \
-                            if field.derived_field else key+'_derived'
-                        self._data[derived_field] = field.converted
                 except ValidationException as e:
                     self._errors.append(MessageRecord(field=key, msg=e.msg))
                     error(logger, e.msg, **kwargs)
@@ -367,16 +367,28 @@ class AttributeModel(Model):
     """Used to describe elements with attributes and no children.
     """
     _value_key = 'value'
+    required_attributes = None
 
     def __init__(self):
         super(AttributeModel, self).__init__()
+        if self.required_attributes is None:
+            self.required_attributes = []
         for name, field in self._fields.items():
             if not field.source:
                 if name == self._value_key:
                     field.source = '#text'
                 else:
-                    attribute_field = Attribute(field)
+                    if name in self.required_attributes:
+                        attribute_field = RequiredAttribute(field)
+                    else:
+                        attribute_field = OptionalAttribute(field)
                     field.source = attribute_field.get_source(name)
+
+    def __setattr__(self, key, value):
+        if key == 'required_attributes':
+            self.__dict__[key] = value
+        else:
+            return super(AttributeModel, self).__setattr__(key, value)
 
 
 class SequenceModel(Model):
@@ -397,7 +409,7 @@ class SequenceModel(Model):
         for tag in self._non_empty_fields:
             if tag in self._fields and self._data[tag] is not None:
                 field = self._fields[tag]
-                if not field.is_attribute:
+                if not field.isAttribute:
                     element_tags.append(tag)
         self._data_sequence = self.match_sequence(element_tags, **kwargs)
 

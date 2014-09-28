@@ -29,3 +29,17 @@ See the :doc:`development` for more information.
 
 
 .. include:: community.rst
+
+Contents:
+
+.. toctree::
+   :maxdepth: 2
+
+   api/fields
+   api/models
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`

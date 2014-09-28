@@ -1,5 +1,5 @@
 import pytest
-from xmodels.fields import Attribute
+from xmodels.fields import OptionalAttribute
 
 from tests.definitions import HierarchicalSequenceModel, Size, \
     VendorExtensions, name_spaces
@@ -15,7 +15,7 @@ class TestElementNoAttributes(object):
         usually contains tests).
         """
         class Register(Model):
-            id = Attribute(CharField(source='@id'))
+            id = OptionalAttribute(CharField())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
@@ -58,7 +58,7 @@ class TestElementWithAttributes(object):
         usually contains tests).
         """
         class Register(Model):
-            id = Attribute(CharField())
+            id = OptionalAttribute(CharField())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
@@ -115,7 +115,7 @@ class TestModelExtra(object):
         class Extras(Model):
             _allow_extra_elements = True
             _allow_extra_attributes = True
-            id = Attribute(CharField())
+            id = OptionalAttribute(CharField())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
