@@ -192,7 +192,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         self._path = ''
         self._source_to_key = None
         self._defaults = {key: field.default for key, field in
-                          self._fields.items() if field.default is not None}
+                          self._clsfields.items() if field.default is not None}
         self._non_empty_fields = set([])
 
     def __str__(self):
@@ -225,23 +225,23 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         else:
             raise AttributeError
 
-    @classmethod
-    def _extract_name_spaces(cls, kwargs, raw_data):
-        name_spaces = kwargs.get('name_spaces', {})
-        keys_to_delete = []
-        for key, value in raw_data.items():
-            if key.startswith('@xmlns'):
-                name_spaces[value] = key.split(':')[1]
-                keys_to_delete.append(key)
-        if 'http://www.w3.org/2001/XMLSchema-instance' in name_spaces:
-            xsi = name_spaces['http://www.w3.org/2001/XMLSchema-instance']
-            schema_location_attr = '@%s:schemaLocation' % xsi
-            if schema_location_attr in raw_data:
-                keys_to_delete.append(schema_location_attr)
-        for key in keys_to_delete:
-            del raw_data[key]
-        kwargs['errors'] = []
-        kwargs['name_spaces'] = name_spaces
+    # @classmethod
+    # def _extract_name_spaces(cls, kwargs, raw_data):
+    #     name_spaces = kwargs.get('name_spaces', {})
+    #     keys_to_delete = []
+    #     for key, value in raw_data.items():
+    #         if key.startswith('@xmlns'):
+    #             name_spaces[value] = key.split(':')[1]
+    #             keys_to_delete.append(key)
+    #     if 'http://www.w3.org/2001/XMLSchema-instance' in name_spaces:
+    #         xsi = name_spaces['http://www.w3.org/2001/XMLSchema-instance']
+    #         schema_location_attr = '@%s:schemaLocation' % xsi
+    #         if schema_location_attr in raw_data:
+    #             keys_to_delete.append(schema_location_attr)
+    #     for key in keys_to_delete:
+    #         del raw_data[key]
+    #     kwargs['errors'] = []
+    #     kwargs['name_spaces'] = name_spaces
 
     @classmethod
     def from_dict(cls, raw_data, **kwargs):
@@ -262,10 +262,12 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         self._source_to_key = {}
         for key, field in self._clsfields.items():
             source = field.get_source(key)
-            if isinstance(field, WrappedObjectField):
-                field_name_space = field.name_space
-            else:
-                field_name_space = self._name_space
+            field_name_space = field.name_space
+            if not field_name_space:
+                if isinstance(field, WrappedObjectField):
+                    field_name_space = field.name_space
+                else:
+                    field_name_space = self._name_space
             if name_spaces and field_name_space in name_spaces:
                 prefix = name_spaces[field_name_space] + ':'
             else:
@@ -277,8 +279,8 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
             else:
                 data_key = prefix + source
             self._source_to_key[data_key] = key
-            self._key_to_source = {value: key for key, value in
-                                   self._source_to_key.items()}
+        self._key_to_source = {value: key for key, value in
+                               self._source_to_key.items()}
 
     def _find_field(self, name):
         if name in self._source_to_key:
@@ -308,7 +310,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                 if key is not None:
                     self._non_empty_fields.add(key)
             if key:
-                field = self._fields[key]
+                field = self._clsfields[key]
                 if isinstance(field, WrappedObjectField):
                     self._data[key] = field.populate(value, **kwargs)
                 else:
@@ -318,20 +320,23 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
 
     def validate(self, **kwargs):
         self._path = self._build_path(**kwargs)
-        for key, field in self._fields.items():
+        for key, field in self._clsfields.items():
             data = self._data.get(key)
             if data is not None:
                 try:
                     kwargs['path'] = self._path
                     self._data[key] = field.validate(data, **kwargs)
                 except ValidationException as e:
-                    self._errors.append(MessageRecord(field=key, msg=e.msg))
-                    error(logger, e.msg, **kwargs)
+                    msg_rec = MessageRecord(path=self._path, field=key,
+                                            msg=e.msg)
+                    self._errors.append(msg_rec)
+                    error(logger, msg_rec, **kwargs)
         if self._extra and not \
                 (self._allow_extra_elements or self._allow_extra_attributes):
             msg = 'Found extra fields: %s' % ','.join(self._extra.keys())
-            self._errors.append(MessageRecord(field='_extra', msg=msg))
-            error(logger, msg, **kwargs)
+            msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
+            self._errors.append(msg_rec)
+            error(logger, msg_rec, **kwargs)
         return self
 
     def deserialize(self, **kwargs):
@@ -342,8 +347,10 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                     kwargs['path'] = self._path
                     self._data[key] = field.deserialize(data, **kwargs)
                 except ValidationException as e:
-                    self._errors.append(MessageRecord(field=key, msg=e.msg))
-                    error(logger, e.msg, **kwargs)
+                    msg_rec = MessageRecord(path=self._path, field=key,
+                                            msg=e.msg)
+                    self._errors.append(msg_rec)
+                    error(logger, msg_rec, **kwargs)
         return self
 
     def serialize(self, **kwargs):
@@ -355,8 +362,10 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                     kwargs['path'] = self._path
                     result[key] = field.serialize(data, **kwargs)
                 except ValidationException as e:
-                    self._errors.append(MessageRecord(field=key, msg=e.msg))
-                    error(logger, e.msg, **kwargs)
+                    msg_rec = MessageRecord(path=self._path, field=key,
+                                            msg=e.msg)
+                    self._errors.append(msg_rec)
+                    error(logger, msg_rec, **kwargs)
         return result
 
     @property
@@ -398,7 +407,7 @@ class AttributeModel(Model):
         super(AttributeModel, self).__init__()
         if self.required_attributes is None:
             self.required_attributes = []
-        for name, field in self._fields.items():
+        for name, field in self._clsfields.items():
             if not field.source:
                 if name == self._value_key:
                     field.source = '#text'
@@ -427,8 +436,9 @@ class SequenceModel(Model):
     def validate(self, **kwargs):
         self._path = self._build_path(**kwargs)
         if self._initial is not None:
-            stores = kwargs.get('stores', Stores())
-            self._initial.add_keys(path=self._path, stores=stores)
+            if kwargs.get('stores') is None:
+                kwargs['stores'] = Stores()
+            self._initial.add_keys(path=self._path, stores=kwargs['stores'])
         super(SequenceModel, self).validate(**kwargs)
         element_tags = []
         for tag in self._non_empty_fields:
@@ -447,8 +457,10 @@ class SequenceModel(Model):
                     result_sequence.append(field.tag)
                 elif field.required:
                     msg = "Missing required key: %s %s" % (field.tag, path)
-                    self._errors.append(MessageRecord(field=field.tag, msg=msg))
-                    error(logger, msg, **kwargs)
+                    msg_rec = MessageRecord(path=self._path, field=field.tag,
+                                            msg=msg)
+                    self._errors.append(msg_rec)
+                    error(logger, msg_rec, **kwargs)
             elif isinstance(field, Choice):
                 choice_keys_sey = set(value_tags) & field.all_keys_set
                 cs = field.match_choice_keys(choice_keys_sey, **kwargs)
@@ -457,8 +469,9 @@ class SequenceModel(Model):
         extra_tags = [tag for tag in value_tags if tag not in result_sequence]
         if extra_tags:
             msg = "Could not match tag(s): %s" % ', '.join(extra_tags)
-            self._errors.append(MessageRecord(field='_extra', msg=msg))
-            error(logger, msg, **kwargs)
+            msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
+            self._errors.append(msg_rec)
+            error(logger, msg_rec, **kwargs)
         return result_sequence
 
     def _get_fields_items(self):

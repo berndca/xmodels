@@ -12,4 +12,4 @@ class CommonEqualityMixin(object):
         return not self.__eq__(other)
 
 
-MessageRecord = namedtuple('MessageRecord', 'field msg'.split())
+MessageRecord = namedtuple('MessageRecord', 'path field msg'.split())

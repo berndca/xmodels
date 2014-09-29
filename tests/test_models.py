@@ -1,10 +1,13 @@
+import datetime
 import pytest
-from xmodels.fields import OptionalAttribute
+from xmodels.constraints import ID, InitStores
+from xmodels.fields import OptionalAttribute, DateTimeField, FloatField, Name
 
 from tests.definitions import HierarchicalSequenceModel, Size, \
     VendorExtensions, name_spaces
-from xmodels import CharField, Model, IntegerField, ModelField
+from xmodels import CharField, Model, IntegerField, ModelField, SequenceModel
 from xmodels.models import SequenceElement, Choice
+from xmodels.utils import MessageRecord
 
 
 class TestElementNoAttributes(object):
@@ -14,20 +17,28 @@ class TestElementNoAttributes(object):
         """ setup any state specific to the execution of the given class (which
         usually contains tests).
         """
-        class Register(Model):
-            id = OptionalAttribute(CharField())
+        class Register(SequenceModel):
+            id = OptionalAttribute(ID())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
+            _sequence = [
+                SequenceElement('name', min_occurs=1),
+                SequenceElement('addressOffset', min_occurs=1),
+                SequenceElement('size', min_occurs=1),
+            ]
 
-        register_dict = {
+        cls.register_dict = {
             'name': 'TestRegister',
+            '@id': 'ID42',
             'addressOffset': '0',
             'size': '32'
         }
-        cls.instance = Register()
-        cls.instance.populate(register_dict)
-        cls.instance.validate()
+        cls.cls = Register
+        cls.instance = Register.from_dict(cls.register_dict)
+
+    def test_pass(self):
+        assert self.instance._errors == []
 
     def test_address_offset(self):
         assert self.instance.addressOffset == 0
@@ -41,6 +52,13 @@ class TestElementNoAttributes(object):
     def test_size_resolve(self):
         assert self.instance.size.resolve == 'resolve'
 
+    def test_size_resolve_fail(self):
+        self.instance.size.resolve = True
+        errors = []
+        self.instance.validate(errors=errors)
+        assert errors == [MessageRecord(path='Register.Size', field='resolve',
+                                        msg='Expecting a string')]
+
     def test_extra_element_fail(self):
         with pytest.raises(AttributeError):
             self.instance.extra = 'element'
@@ -49,6 +67,14 @@ class TestElementNoAttributes(object):
         with pytest.raises(AttributeError):
             setattr(self.instance, '@extra', 'attribute')
 
+    def test_extra_element_from_dict_fail(self):
+        reg_dict = {key: value for key, value in self.register_dict.items()}
+        reg_dict['extra_element'] = 'causing an error'
+        errors = []
+        self.cls.from_dict(reg_dict, errors=errors)
+        assert errors == [MessageRecord(
+            path='Register', field='_extra',
+            msg='Found extra fields: extra_element')]
 
 class TestElementWithAttributes(object):
 
@@ -58,7 +84,7 @@ class TestElementWithAttributes(object):
         usually contains tests).
         """
         class Register(Model):
-            id = OptionalAttribute(CharField())
+            id = OptionalAttribute(ID())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
@@ -68,6 +94,7 @@ class TestElementWithAttributes(object):
             'addressOffset': '0',
             'size': {
                 '#text': '32',
+                '@id': 'ID33',
                 '@format': 'long',
                 }
         }
@@ -83,6 +110,13 @@ class TestElementWithAttributes(object):
 
     def test_size_resolve(self):
         assert self.instance.size.resolve == 'resolve'
+
+    def test_str(self):
+        assert str(self.instance) == "Register: 'addressOffset': IntegerField, " \
+                                     "'id': OptionalAttribute, " \
+                                     "'name': CharField, " \
+                                     "'size': ModelField: Size"
+        assert str(self.instance) == repr(self.instance)
 
 
 class TestHierarchicalClass(object):
@@ -141,6 +175,11 @@ class TestModelExtra(object):
 def test_sequence_element_defaults():
     se = SequenceElement('component')
     assert se.tag == 'component' and se.min_occurs == 0
+
+
+def test_sequence_element_str():
+    se = SequenceElement('component')
+    assert str(se) == 'SequenceElement: component (0, 0)'
 
 
 def test_sequence_element_min_occurs():
@@ -285,7 +324,7 @@ class TestSequenceModel():
                                                  'driveConstraint',
                                                  'marketShare'])
         assert sequence == ['name', 'busRef', 'driveConstraint',
-                            'marketShare'] and not self.instance.fail
+                            'marketShare'] and not self.instance._errors
 
     def test_match_sequence_fail(self):
         errors = []
@@ -324,16 +363,18 @@ class TestNameSpacePrefix():
 
     @classmethod
     def setup_class(cls):
-        d = {u'accellera:wire':
-                 {u'accellera-power:wirePowerDefs':
-                      {u'accellera-power:wirePowerDef': [
-                          {u'accellera-power:domain': u'domain2',
-                           u'accellera-power:isolation': u'L'},
-                          {u'accellera-power:domain': u'domain3',
-                           u'spirit:vector': {u'spirit:left': u'3',
-                                              u'spirit:right': u'0'}}]}}}
+        d = {'accellera:wire': {
+            '@spirit:id': 'ID42',
+            'accellera-power:wirePowerDefs': 
+                {'accellera-power:wirePowerDef': [ 
+                    {'accellera-power:domain': 'domain2', 
+                     'accellera-power:isolation': 'L'}, 
+                    {'accellera-power:domain': 'domain3', 
+                     'spirit:vector': 
+                         {'spirit:left': '3', 
+                          'spirit:right': '0'}}]}}}
+        cls.raw_data = d
         cls.inst = VendorExtensions.from_dict(d, name_spaces=name_spaces)
-        cls.inst.validate(name_spaces=name_spaces)
 
     def test_isolation(self):
         assert self.inst.wire.wirePowerDefs.wirePowerDef[0].isolation == 'L'
@@ -373,12 +414,95 @@ class TestNameSpacePrefix():
                'VendorExtensions.WireExtension.WirePowerDefs.WirePowerDef[1].Vector'
 
     def test_do_dict(self):
-        d = {u'accellera:wire':
-                 {u'accellera-power:wirePowerDefs':
-                      {u'accellera-power:wirePowerDef': [
-                          {u'accellera-power:domain': u'domain2',
-                           u'accellera-power:isolation': u'L'},
-                          {u'accellera-power:domain': u'domain3',
-                           u'spirit:vector': {u'spirit:left': 3,
-                                              u'spirit:right': 0}}]}}}
+        d = {'accellera:wire': {
+            '@spirit:id': 'ID42',
+            'accellera-power:wirePowerDefs':
+                  {'accellera-power:wirePowerDef': [
+                      {'accellera-power:domain': 'domain2',
+                       'accellera-power:isolation': 'L'},
+                      {'accellera-power:domain': 'domain3',
+                       'spirit:vector': {'spirit:left': 3,
+                                          'spirit:right': 0}}]}}}
         assert self.inst.to_dict(name_spaces=name_spaces) == d
+
+
+class TestSerialization(object):
+
+    @classmethod
+    def setup_class(cls):
+        class Basic(Model):
+            created = DateTimeField()
+            probability = FloatField()
+
+        cls.basic_dict = {
+            'created': '2014-08-24T16:57:00',
+            'probability': '0.21',
+        }
+        cls.cls = Basic
+        cls.instance = Basic.from_dict(cls.basic_dict)
+        cls.instance.deserialize()
+
+    def test_float_pass(self):
+        assert self.instance.probability == 0.21
+
+    def test_date_pass(self):
+        assert self.instance.created == datetime.datetime(2014, 8, 24, 16, 57)
+
+    def test_deserialize_fail(self):
+        errors = []
+        inst = self.cls.from_dict(self.basic_dict)
+        inst.probability = 'not a number'
+        inst.deserialize(errors=errors)
+        assert errors == [MessageRecord(path='Basic', field='probability',
+                                        msg='Could not convert to float:')]
+
+    def test_serialize_pass(self):
+        result = self.instance.serialize()
+        assert result == self.basic_dict
+
+    def test_serialize_multiple_pass(self):
+        self.instance.serialize()
+        result = self.instance.serialize()
+        assert result == self.basic_dict
+
+    def test_serialize_fail(self):
+        inst = self.cls.from_dict(self.basic_dict)
+        inst.deserialize()
+        inst._fields['probability'].serial_format = '{'
+        errors = []
+        inst.serialize(errors=errors)
+        assert errors == [MessageRecord(
+            path='Basic', field='probability',
+            msg='Could not convert float to string with format {.')]
+
+
+class TestSequenceModels():
+    @classmethod
+    def setup_class(cls):
+        class InitSystemGroupKey(InitStores):
+            key_names = ['systemGroupNameKey']
+
+        class Sequence0(SequenceModel):
+            _initial = InitSystemGroupKey()
+            id = OptionalAttribute(ID())
+            name = Name()
+            size = IntegerField(min=1)
+            _sequence = [
+                SequenceElement('name', min_occurs=1),
+                SequenceElement('size', min_occurs=1),
+            ]
+
+        cls.cls = Sequence0
+
+    def test_sequence_pass(self):
+        seq_data = dict(name='test', size='10')
+        inst = self.cls.from_dict(seq_data)
+        assert inst.size == 10
+
+    def test_match_sequence_fail(self):
+        seq_data = dict(name='test')
+        errors = []
+        self.cls.from_dict(seq_data, errors=errors)
+        assert errors == [MessageRecord(path='Sequence0', field='size',
+                                        msg='Missing required key: size ')]
+

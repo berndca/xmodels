@@ -51,11 +51,13 @@ class BaseField(CommonEqualityMixin):
 
     """
     serial_format = None
+    _name_space = None
 
     def __init__(self, **kwargs):
         self.source = kwargs.get('source')
         self.default = kwargs.get('default')
         self.serial_format = kwargs.get('serial_format', self.serial_format)
+        self._name_space = kwargs.get('name_space', self._name_space)
         self.isAttribute = False
 
     def __str__(self):
@@ -94,6 +96,10 @@ class BaseField(CommonEqualityMixin):
     def serialize(self, py_data, **kwargs):
         return self.validate(py_data, **kwargs)
 
+    @property
+    def name_space(self):
+        return self._name_space
+
 
 class RequiredAttribute(BaseField):
     """Describes a required XML attribute."""
@@ -103,6 +109,8 @@ class RequiredAttribute(BaseField):
         super(RequiredAttribute, self).__init__(**kwargs)
         self.field_instance = field_instance
         self.default = self.field_instance.default
+        self.source = self.field_instance.source
+        self._name_space = self.field_instance.name_space
         self.messages = self.field_instance.messages
         self.isAttribute = True
 

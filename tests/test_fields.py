@@ -56,6 +56,11 @@ class TestBaseField():
         inst2 = OptionalAttribute(CharField())
         assert inst1 != inst2
 
+    def test_name_space_kwarg(self):
+        name_space="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        id = OptionalAttribute(CharField(name_space=name_space))
+        assert id.name_space == name_space
+
 
 class TestAttribute():
     @classmethod
