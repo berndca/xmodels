@@ -21,7 +21,7 @@ import re
 from six import string_types
 
 from .utils import CommonEqualityMixin
-from .PySO8601 import ParseError, parse, parse_time, parse_date
+from .iso8601 import ParseError, parse, parse_time, parse_date
 
 
 logger = logging.getLogger(__name__)
