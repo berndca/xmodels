@@ -1,7 +1,8 @@
 import datetime
 import pytest
 from xmodels.constraints import ID, InitStores
-from xmodels.fields import OptionalAttribute, DateTimeField, FloatField, Name
+from xmodels.fields import OptionalAttribute, DateTimeField, FloatField, Name, \
+    RequiredAttribute
 
 from tests.definitions import HierarchicalSequenceModel, Size, \
     VendorExtensions, name_spaces
@@ -432,11 +433,11 @@ class TestSerialization(object):
     def setup_class(cls):
         class Basic(Model):
             created = DateTimeField()
-            probability = FloatField()
+            probability = RequiredAttribute(FloatField())
 
         cls.basic_dict = {
             'created': '2014-08-24T16:57:00',
-            'probability': '0.21',
+            '@probability': '0.21',
         }
         cls.cls = Basic
         cls.instance = Basic.from_dict(cls.basic_dict)

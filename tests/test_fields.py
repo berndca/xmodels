@@ -54,6 +54,12 @@ class TestBaseField():
         inst2 = OptionalAttribute(CharField())
         assert inst1 != inst2
 
+    def test_empty_fail(self):
+        inst1 = RequiredAttribute(CharField())
+        with pytest.raises(ValidationException) as exc_info:
+            inst1.validate(None)
+        assert exc_info.value.msg == inst1.messages['required']
+
     def test_name_space_kwarg(self):
         name_space="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
         id = OptionalAttribute(CharField(name_space=name_space))
@@ -90,6 +96,7 @@ class TestAttribute():
 
     def test_is_attribute(self):
         assert self.instance.isAttribute
+
 
 def test_required_attribute_full_source():
     attr = RequiredAttribute(CharField(source='@id'))

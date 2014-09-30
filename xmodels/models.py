@@ -260,25 +260,12 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
 
     def _gen_key_to_from_source(self, name_spaces):
         self._source_to_key = {}
+        default_prefix = ''
+        if name_spaces and self._name_space in name_spaces:
+            default_prefix = ''.join([name_spaces[self._name_space], ':'])
         for key, field in self._clsfields.items():
-            source = field.get_source(key)
-            field_name_space = field.name_space
-            if not field_name_space:
-                if isinstance(field, WrappedObjectField):
-                    field_name_space = field.name_space
-                else:
-                    field_name_space = self._name_space
-            if name_spaces and field_name_space in name_spaces:
-                prefix = name_spaces[field_name_space] + ':'
-            else:
-                prefix = ''
-            if source[0] == '@':
-                data_key = '@' + prefix + source[1:]
-            elif source == '#text':
-                data_key = '#text'
-            else:
-                data_key = prefix + source
-            self._source_to_key[data_key] = key
+            source = field.get_source(key, name_spaces, default_prefix)
+            self._source_to_key[source] = key
         self._key_to_source = {value: key for key, value in
                                self._source_to_key.items()}
 
@@ -354,13 +341,16 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         return self
 
     def serialize(self, **kwargs):
+        name_spaces = kwargs.get('name_spaces')
+        self._gen_key_to_from_source(name_spaces)
         result = {key: value for key, value in self._extra.items()}
         for key, field in self._fields.items():
             data = self._data.get(key)
             if data is not None:
                 try:
                     kwargs['path'] = self._path
-                    result[key] = field.serialize(data, **kwargs)
+                    serialized_key = self._key_to_source[key]
+                    result[serialized_key] = field.serialize(data, **kwargs)
                 except ValidationException as e:
                     msg_rec = MessageRecord(path=self._path, field=key,
                                             msg=e.msg)

@@ -66,14 +66,18 @@ class BaseField(CommonEqualityMixin):
     def __repr__(self):
         return self.__str__()
 
-    def get_source(self, key):
+    def get_source(self, key, name_spaces=None, default_prefix=''):
         """Generates the dictionary key for the serialized representation
         based on the instance variable source and a provided key.
 
         :param str key: name of the field in model
         :returns: self.source or key
         """
-        return self.source or key
+        source = self.source or key
+        prefix = default_prefix
+        if name_spaces and self.name_space and self.name_space in name_spaces:
+            prefix = ''.join([name_spaces[self.name_space], ':'])
+        return ''.join([prefix, source])
 
     def validate(self, raw_data, **kwargs):
         """The validate method validates raw_data against the field .
@@ -104,29 +108,45 @@ class BaseField(CommonEqualityMixin):
 class RequiredAttribute(BaseField):
     """Describes a required XML attribute."""
     required = True
+    field_instance = None
 
     def __init__(self, field_instance, **kwargs):
         super(RequiredAttribute, self).__init__(**kwargs)
-        self.field_instance = field_instance
-        self.default = self.field_instance.default
-        self.source = self.field_instance.source
-        self._name_space = self.field_instance.name_space
-        self.messages = self.field_instance.messages
         self.isAttribute = True
+        self.default = field_instance.default
+        self.source = field_instance.source
+        self._name_space = field_instance.name_space
+        self.messages = field_instance.messages
+        self.messages['required'] = 'Required attribute field has no data.'
+        self.field_instance = field_instance
 
-    def get_source(self, key):
-        source = self.source or self.field_instance.source or key
-        if source.startswith('@'):
+    def __setattr__(self, key, value):
+        if self.field_instance:
+            setattr(self.field_instance, key, value)
+        else:
+            self.__dict__[key] = value
+
+    def get_source(self, key, name_spaces=None, default_prefix=''):
+        source_key = self.field_instance.source or key
+        source = super(RequiredAttribute, self).get_source(
+            source_key, name_spaces, default_prefix)
+        if source[0] == '@':
             return source
-        return '@' + source
+        return ''.join(['@', source])
 
     def validate(self, raw_data, **kwargs):
         if raw_data is None:
             if self.required:
-                raise ValidationException('Required field has no data.',
+                raise ValidationException(self.messages['required'],
                                           self.__str__())
         else:
             return self.field_instance.validate(raw_data, **kwargs)
+
+    def deserialize(self, raw_data, **kwargs):
+        return self.field_instance.deserialize(raw_data, **kwargs)
+
+    def serialize(self, py_data, **kwargs):
+        return self.field_instance.serialize(py_data, **kwargs)
 
 
 class OptionalAttribute(RequiredAttribute):
