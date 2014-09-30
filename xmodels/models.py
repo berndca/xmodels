@@ -293,11 +293,11 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         self._gen_key_to_from_source(name_spaces)
         for name, value in data.items():
             key = self._find_field(name)
-            if data is not None:
-                if key is not None:
-                    self._non_empty_fields.add(key)
             if key:
                 field = self._clsfields[key]
+                if value is not None or field.accept_none:
+                    if key is not None:
+                        self._non_empty_fields.add(key)
                 if isinstance(field, WrappedObjectField):
                     self._data[key] = field.populate(value, **kwargs)
                 else:
@@ -350,7 +350,11 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                 try:
                     kwargs['path'] = self._path
                     serialized_key = self._key_to_source[key]
-                    result[serialized_key] = field.serialize(data, **kwargs)
+                    serialized_data = field.serialize(data, **kwargs)
+                    if serialized_data == {}:
+                        result[serialized_key] = None
+                    else:
+                        result[serialized_key] = serialized_data
                 except ValidationException as e:
                     msg_rec = MessageRecord(path=self._path, field=key,
                                             msg=e.msg)

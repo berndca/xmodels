@@ -5,7 +5,7 @@ from xmodels.fields import OptionalAttribute, DateTimeField, FloatField, Name, \
     RequiredAttribute
 
 from tests.definitions import HierarchicalSequenceModel, Size, \
-    VendorExtensions, name_spaces
+    VendorExtensions, name_spaces, Port
 from xmodels import CharField, Model, IntegerField, ModelField, SequenceModel
 from xmodels.models import SequenceElement, Choice
 from xmodels.utils import MessageRecord
@@ -308,11 +308,11 @@ class TestChoiceMixedOptions():
 
 def test_optional_choice():
     choice = Choice(options=[
-        SequenceElement('optional1'),
-        SequenceElement('optional2'),
+        SequenceElement('optional1', min_occurs=1),
+        SequenceElement('optional2', min_occurs=1),
     ], required=False)
     assert choice.match_choice_keys(set([])) == []
-
+    assert True
 
 class TestSequenceModel():
 
@@ -507,3 +507,48 @@ class TestSequenceModels():
         assert errors == [MessageRecord(path='Sequence0', field='size',
                                         msg='Missing required key: size ')]
 
+
+def test_empty_modelfield():
+    d = dict(logicalName='lname', wire=None)
+    inst = Port.from_dict(d)
+    serialized = inst.serialize()
+    assert serialized == d
+
+
+class TestXMLDict():
+    
+    d = {'spirit:abstractionDefinition': 
+             {'@xmlns:accellera': 
+                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE', 
+              '@xmlns:accellera-power': 
+                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0', 
+              '@xmlns:spirit': 
+                  'http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009', 
+              '@xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance', 
+              '@xsi:schemaLocation': 
+                  'http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009 '
+                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009/index.xsd '
+                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE '
+                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE-1.0/index.xsd', 
+              'spirit:busType': {
+                  '@spirit:library': 'test', 
+                  '@spirit:name': 'busdef', 
+                  '@spirit:vendor': 'Mds', 
+                  '@spirit:version': '1.0'}, 
+              'spirit:library': 'test', 
+              'spirit:name': 'absdef', 
+              'spirit:ports': {
+                  'spirit:port': [
+                      {'spirit:logicalName': 'lo1', 'spirit:wire': None}, 
+                      {'spirit:logicalName': 'lo2', 
+                       'spirit:vendorExtensions': {
+                           'accellera:logicalWire': {
+                               'accellera-power:logicalWirePowerDefs': {
+                                   'accellera-power:logicalWirePowerDef': {
+                                       'accellera-power:domain': 'domain4', 
+                                       'accellera-power:idle': '1', 
+                                       'accellera-power:isolation': 'Z', 
+                                       'accellera-power:reset': '0'}}}}, 
+                       'spirit:wire': None}]}, 
+              'spirit:vendor': 'Mds', 
+              'spirit:version': '1.0'}}

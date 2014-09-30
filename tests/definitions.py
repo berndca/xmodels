@@ -152,10 +152,83 @@ class WireExtension(SequenceModel):
     _name_space = "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE"
 
 
+class Wire(SequenceModel):
+    qualifier = CharField()
+    onSystem = ModelCollectionField(CharField())
+    onMaster = CharField()
+    onSlave = CharField()
+    defaultValue = CharField()
+    requiresDriver = CharField()
+    _sequence = [
+        SequenceElement('qualifier'),
+        SequenceElement('onSystem'),
+        SequenceElement('onMaster'),
+        SequenceElement('onSlave'),
+        Choice(required=False, options=[
+            SequenceElement('defaultValue', min_occurs=1),
+            SequenceElement('requiresDriver', min_occurs=1)])
+    ]
+    _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+
+
+class Port(SequenceModel):
+    logicalName = CharField()
+    displayName = CharField()
+    description = CharField()
+    wire = ModelField(Wire, accept_none=True)
+    transactional = CharField()
+    _sequence = [
+        SequenceElement('logicalName', min_occurs=1),
+        SequenceElement('displayName'),
+        SequenceElement('description'),
+        Choice(options=[
+            SequenceElement('wire', min_occurs=1),
+            SequenceElement('transactional', min_occurs=1),
+        ])
+    ]
+    _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+
+
+class LibraryRef(AttributeModel):
+    vendor = CharField()
+    library = CharField()
+    name = CharField()
+    version = CharField()
+    _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+
+
+class Ports(SequenceModel):
+    port = ModelCollectionField(Port)
+    _sequence = [SequenceElement('port', min_occurs=1)]
+    _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+
+
 class VendorExtensions(SequenceModel):
     wire = ModelField(WireExtension)
     _sequence = [
         SequenceElement('wire'),
+    ]
+    _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+
+
+class AbstractDefinition(SequenceModel):
+    vendor = CharField()
+    library = CharField()
+    name = CharField()
+    version = CharField()
+    busType = ModelField(LibraryRef)
+    extends = ModelField(LibraryRef)
+    ports = ModelField(Ports)
+    description = CharField()
+    _sequence = [
+        SequenceElement('vendor', min_occurs=1),
+        SequenceElement('library', min_occurs=1),
+        SequenceElement('name', min_occurs=1),
+        SequenceElement('version', min_occurs=1),
+        SequenceElement('busType', min_occurs=1),
+        SequenceElement('extends'),
+        SequenceElement('ports', min_occurs=1),
+        SequenceElement('description'),
     ]
     _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
 

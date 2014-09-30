@@ -644,6 +644,7 @@ class WrappedObjectField(BaseField):
 
     def __init__(self, wrapped_class, **kwargs):
         self._wrapped_class = wrapped_class
+        self.accept_none = kwargs.get('accept_none', False)
         super(WrappedObjectField, self).__init__(**kwargs)
 
     def __str__(self):
@@ -657,7 +658,7 @@ class WrappedObjectField(BaseField):
             obj = self._wrapped_class()
             if isinstance(raw_data, (dict, OrderedDict)):
                 obj.populate(raw_data, **kwargs)
-            else:
+            elif raw_data is not None:
                 obj.populate({'#text': raw_data}, **kwargs)
         return obj
 
