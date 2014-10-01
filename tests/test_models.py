@@ -1,18 +1,19 @@
+from collections import OrderedDict
 import datetime
+
 import pytest
+
 from xmodels.constraints import ID, InitStores
 from xmodels.fields import OptionalAttribute, DateTimeField, FloatField, Name, \
     RequiredAttribute
-
 from tests.definitions import HierarchicalSequenceModel, Size, \
-    VendorExtensions, name_spaces, Port
+    VendorExtensions, name_spaces, Port, AbstractDefinition, LibraryRef
 from xmodels import CharField, Model, IntegerField, ModelField, SequenceModel
 from xmodels.models import SequenceElement, Choice
 from xmodels.utils import MessageRecord
 
 
 class TestElementNoAttributes(object):
-
     @classmethod
     def setup_class(cls):
         """ setup any state specific to the execution of the given class (which
@@ -77,8 +78,8 @@ class TestElementNoAttributes(object):
             path='Register', field='_extra',
             msg='Found extra fields: extra_element')]
 
-class TestElementWithAttributes(object):
 
+class TestElementWithAttributes(object):
     @classmethod
     def setup_class(cls):
         """ setup any state specific to the execution of the given class (which
@@ -97,7 +98,7 @@ class TestElementWithAttributes(object):
                 '#text': '32',
                 '@id': 'ID33',
                 '@format': 'long',
-                }
+            }
         }
         cls.instance = Register()
         cls.instance.populate(register_dict)
@@ -121,7 +122,6 @@ class TestElementWithAttributes(object):
 
 
 class TestHierarchicalClass(object):
-
     @classmethod
     def setup_class(cls):
         class ChildModel(Model):
@@ -144,7 +144,6 @@ class TestHierarchicalClass(object):
 
 
 class TestModelExtra(object):
-
     @classmethod
     def setup_class(cls):
         class Extras(Model):
@@ -154,6 +153,7 @@ class TestModelExtra(object):
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
+
         cls.cls = Extras
         cls.instance = Extras()
 
@@ -165,11 +165,11 @@ class TestModelExtra(object):
         setattr(self.instance, '@extra', 'attribute')
         assert getattr(self.instance, '@extra') == 'attribute'
 
-    def test_extra_to_dict(self):
+    def test_extra_serialize(self):
         d = {'@id': 'ID42', 'name': 'Name', 'addressOffset': 2,
              'extra': 'element', '@extra': 'attribute'}
         inst = self.cls.from_dict(d)
-        result = inst.to_dict()
+        result = inst.serialize()
         assert result == d
 
 
@@ -199,7 +199,6 @@ def test_sequence_element_max_assert_fail():
 
 
 class TestChoiceScalarOptions():
-
     @classmethod
     def setup_class(cls):
         cls.choice = Choice(options=[
@@ -222,7 +221,6 @@ class TestChoiceScalarOptions():
 
 
 class TestChoiceListOptions():
-
     @classmethod
     def setup_class(cls):
         option1 = [
@@ -269,7 +267,6 @@ class TestChoiceListOptions():
 
 
 class TestChoiceMixedOptions():
-
     @classmethod
     def setup_class(cls):
         option1 = [
@@ -314,8 +311,8 @@ def test_optional_choice():
     assert choice.match_choice_keys(set([])) == []
     assert True
 
-class TestSequenceModel():
 
+class TestSequenceModel():
     @classmethod
     def setup_class(cls):
         cls.instance = HierarchicalSequenceModel()
@@ -342,7 +339,6 @@ class TestSequenceModel():
 
 
 class TestToDictMin():
-
     @classmethod
     def setup_class(cls):
         child = HierarchicalSequenceModel.gen_child_min_dict()
@@ -361,74 +357,75 @@ class TestToDictMin():
 
 
 class TestNameSpacePrefix():
-
     @classmethod
     def setup_class(cls):
-        d = {'accellera:wire': {
+        d = {'accellera:logicalWire': {
             '@spirit:id': 'ID42',
-            'accellera-power:wirePowerDefs': 
-                {'accellera-power:wirePowerDef': [ 
-                    {'accellera-power:domain': 'domain2', 
-                     'accellera-power:isolation': 'L'}, 
-                    {'accellera-power:domain': 'domain3', 
-                     'spirit:vector': 
-                         {'spirit:left': '3', 
+            'accellera-power:logicalWirePowerDefs':
+                {'accellera-power:logicalWirePowerDef': [
+                    {'accellera-power:domain': 'domain2',
+                     'accellera-power:isolation': 'L'},
+                    {'accellera-power:domain': 'domain3',
+                     'spirit:vector':
+                         {'spirit:left': '3',
                           'spirit:right': '0'}}]}}}
         cls.raw_data = d
         cls.inst = VendorExtensions.from_dict(d, name_spaces=name_spaces)
+        cls.lwpDefs = [lwpDef for lwpDef in cls.inst.logicalWire.logicalWirePowerDefs.logicalWirePowerDef]
 
     def test_isolation(self):
-        assert self.inst.wire.wirePowerDefs.wirePowerDef[0].isolation == 'L'
+        assert self.lwpDefs[0].isolation == 'L'
 
     def test_domain0(self):
-        assert self.inst.wire.wirePowerDefs.wirePowerDef[0].domain == 'domain2'
+        assert self.lwpDefs[0].domain == 'domain2'
 
     def test_domain1(self):
-        assert self.inst.wire.wirePowerDefs.wirePowerDef[1].domain == 'domain3'
+        assert self.lwpDefs[1].domain == 'domain3'
 
     def test_vector_left(self):
-        assert self.inst.wire.wirePowerDefs.wirePowerDef[1].vector.left == 3
+        assert self.lwpDefs[1].vector.left == 3
 
     def test_vector_right(self):
-        assert self.inst.wire.wirePowerDefs.wirePowerDef[1].vector.right == 0
+        assert self.lwpDefs[1].vector.right == 0
 
     def test_root_path(self):
         assert self.inst._path == 'VendorExtensions'
 
     def test_wire_path(self):
-        assert self.inst.wire._path == 'VendorExtensions.WireExtension'
+        assert self.inst.logicalWire._path == \
+               'VendorExtensions.AccelleraLogicalWire'
 
     def test_wire_power_defs_path(self):
-        assert self.inst.wire.wirePowerDefs._path == \
-               'VendorExtensions.WireExtension.WirePowerDefs'
+        assert self.inst.logicalWire.logicalWirePowerDefs._path == \
+               'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs'
 
     def test_wire_power_def0_path(self):
-        assert self.inst.wire.wirePowerDefs.wirePowerDef[0]._path == \
-               'VendorExtensions.WireExtension.WirePowerDefs.WirePowerDef[0]'
+        assert self.lwpDefs[0]._path == \
+               'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs.LogicalWirePowerDef[0]'
 
     def test_wire_power_def1_path(self):
-        assert self.inst.wire.wirePowerDefs.wirePowerDef[1]._path == \
-               'VendorExtensions.WireExtension.WirePowerDefs.WirePowerDef[1]'
+        assert self.lwpDefs[1]._path == \
+               'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs.LogicalWirePowerDef[1]'
 
     def test_vector_path(self):
-        assert self.inst.wire.wirePowerDefs.wirePowerDef[1].vector._path == \
-               'VendorExtensions.WireExtension.WirePowerDefs.WirePowerDef[1].Vector'
+        assert self.lwpDefs[1].vector._path == \
+               'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs.LogicalWirePowerDef[1].Vector'
 
     def test_do_dict(self):
-        d = {'accellera:wire': {
+        d = {'accellera:logicalWire': {
             '@spirit:id': 'ID42',
-            'accellera-power:wirePowerDefs':
-                  {'accellera-power:wirePowerDef': [
-                      {'accellera-power:domain': 'domain2',
-                       'accellera-power:isolation': 'L'},
-                      {'accellera-power:domain': 'domain3',
-                       'spirit:vector': {'spirit:left': 3,
-                                          'spirit:right': 0}}]}}}
-        assert self.inst.to_dict(name_spaces=name_spaces) == d
+            'accellera-power:logicalWirePowerDefs':
+                {'accellera-power:logicalWirePowerDef': [
+                    {'accellera-power:domain': 'domain2',
+                     'accellera-power:isolation': 'L'},
+                    {'accellera-power:domain': 'domain3',
+                     'spirit:vector':
+                         {'spirit:left': 3,
+                          'spirit:right': 0}}]}}}
+        assert self.inst.serialize(name_spaces=name_spaces) == d
 
 
 class TestSerialization(object):
-
     @classmethod
     def setup_class(cls):
         class Basic(Model):
@@ -515,40 +512,113 @@ def test_empty_modelfield():
     assert serialized == d
 
 
+class TestAttributeModel():
+    @classmethod
+    def setup_class(cls):
+        cls.d = {
+            '@spirit:library': 'test',
+            '@spirit:name': 'busdef',
+            '@spirit:vendor': 'Mds',
+            '@spirit:version': '1.0'
+        }
+
+    def test_from_xml(self):
+        inst = LibraryRef()
+        inst.populate(self.d, name_spaces=name_spaces)
+        errors = []
+        inst.validate(errors=errors)
+        assert inst.serialize() == {
+            '@library': 'test',
+            '@name': 'busdef',
+            '@vendor': 'Mds',
+            '@version': '1.0'}
+
+
+class TestSerialize():
+    @classmethod
+    def setup_class(cls):
+        class Basic(SequenceModel):
+            zzz = IntegerField()
+            a = IntegerField()
+            _sequence = [
+                SequenceElement('zzz'),
+                SequenceElement('a'),
+            ]
+
+        cls.inst = Basic.from_dict(dict(zzz=22, a=999))
+
+    def test_serialize_to_dict(self):
+        result = self.inst.serialize().items()
+        assert not isinstance(result, OrderedDict)
+
+    def test_serialize_to_ordered_dict(self):
+        kwargs = {'dict_constructor': OrderedDict}
+        serialized_items = list(self.inst.serialize(**kwargs).items())
+        assert serialized_items == [('zzz', 22), ('a', 999)]
+
+
 class TestXMLDict():
-    
-    d = {'spirit:abstractionDefinition': 
-             {'@xmlns:accellera': 
-                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE', 
-              '@xmlns:accellera-power': 
-                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0', 
-              '@xmlns:spirit': 
-                  'http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009', 
-              '@xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance', 
-              '@xsi:schemaLocation': 
-                  'http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009 '
-                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009/index.xsd '
-                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE '
-                  'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE-1.0/index.xsd', 
-              'spirit:busType': {
-                  '@spirit:library': 'test', 
-                  '@spirit:name': 'busdef', 
-                  '@spirit:vendor': 'Mds', 
-                  '@spirit:version': '1.0'}, 
-              'spirit:library': 'test', 
-              'spirit:name': 'absdef', 
-              'spirit:ports': {
-                  'spirit:port': [
-                      {'spirit:logicalName': 'lo1', 'spirit:wire': None}, 
-                      {'spirit:logicalName': 'lo2', 
-                       'spirit:vendorExtensions': {
-                           'accellera:logicalWire': {
-                               'accellera-power:logicalWirePowerDefs': {
-                                   'accellera-power:logicalWirePowerDef': {
-                                       'accellera-power:domain': 'domain4', 
-                                       'accellera-power:idle': '1', 
-                                       'accellera-power:isolation': 'Z', 
-                                       'accellera-power:reset': '0'}}}}, 
-                       'spirit:wire': None}]}, 
-              'spirit:vendor': 'Mds', 
-              'spirit:version': '1.0'}}
+    @classmethod
+    def setup_class(cls):
+        d = {'spirit:abstractionDefinition': {
+        '@xmlns:accellera': 'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE',
+        '@xmlns:accellera-power': 'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0',
+        '@xmlns:spirit': 'http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009',
+        '@xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
+        '@xsi:schemaLocation': 'http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009 '
+                               'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009/index.xsd '
+                               'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE '
+                               'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE-1.0/index.xsd',
+        'spirit:busType': {'@spirit:library': 'test', '@spirit:name': 'busdef',
+                           '@spirit:vendor': 'Mds', '@spirit:version': '1.0'},
+        'spirit:library': 'test', 'spirit:name': 'absdef', 'spirit:ports': {
+        'spirit:port': [{'spirit:logicalName': 'lo1', 'spirit:wire': None},
+                        {'spirit:logicalName': 'lo2',
+                         'spirit:vendorExtensions': {'accellera:logicalWire': {
+                         'accellera-power:logicalWirePowerDefs': {
+                         'accellera-power:logicalWirePowerDef': {
+                         'accellera-power:domain': 'domain4',
+                         'accellera-power:idle': '1',
+                         'accellera-power:isolation': 'Z',
+                         'accellera-power:reset': '0'}}}},
+                         'spirit:wire': None}]}, 'spirit:vendor': 'Mds',
+        'spirit:version': '1.0'}}
+        cls.in_dict = d
+
+    def test_from_xml(self):
+        inst = AbstractDefinition()
+        inst.from_xml(self.in_dict, name_spaces=name_spaces)
+        errors = []
+        inst.validate(errors=errors)
+        lwp = OrderedDict([('domain', 'domain4'),
+                           ('isolation', 'Z'),
+                           ('idle', '1'),
+                           ('reset', '0')])
+        ve_data = OrderedDict([('logicalWire', OrderedDict([
+                ('logicalWirePowerDefs', OrderedDict([
+                    ('logicalWirePowerDef', [lwp])]))]))])
+        expected = OrderedDict([
+            ('vendor', 'Mds'),
+            ('library', 'test'),
+            ('name', 'absdef'),
+            ('version', '1.0'),
+            ('busType',
+             OrderedDict([
+                 ('@vendor', 'Mds'),
+                 ('@library', 'test'),
+                 ('@name', 'busdef'),
+                 ('@version', '1.0')])),
+             ('ports', OrderedDict([
+                 ('port', [
+                         OrderedDict([
+                             ('logicalName', 'lo1'),
+                             ('wire', None),
+                         ]),
+                         OrderedDict([
+                         ('logicalName', 'lo2'),
+                         ('wire', None),
+                         ('vendorExtensions', ve_data)
+                        ])
+                    ]
+                 )]))])
+        assert inst.serialize() == expected

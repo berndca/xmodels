@@ -225,24 +225,6 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         else:
             raise AttributeError
 
-    # @classmethod
-    # def _extract_name_spaces(cls, kwargs, raw_data):
-    #     name_spaces = kwargs.get('name_spaces', {})
-    #     keys_to_delete = []
-    #     for key, value in raw_data.items():
-    #         if key.startswith('@xmlns'):
-    #             name_spaces[value] = key.split(':')[1]
-    #             keys_to_delete.append(key)
-    #     if 'http://www.w3.org/2001/XMLSchema-instance' in name_spaces:
-    #         xsi = name_spaces['http://www.w3.org/2001/XMLSchema-instance']
-    #         schema_location_attr = '@%s:schemaLocation' % xsi
-    #         if schema_location_attr in raw_data:
-    #             keys_to_delete.append(schema_location_attr)
-    #     for key in keys_to_delete:
-    #         del raw_data[key]
-    #     kwargs['errors'] = []
-    #     kwargs['name_spaces'] = name_spaces
-
     @classmethod
     def from_dict(cls, raw_data, **kwargs):
         """
@@ -342,16 +324,17 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
 
     def serialize(self, **kwargs):
         name_spaces = kwargs.get('name_spaces')
+        dict_constructor = kwargs.get('dict_constructor', dict)
         self._gen_key_to_from_source(name_spaces)
-        result = {key: value for key, value in self._extra.items()}
-        for key, field in self._fields.items():
-            data = self._data.get(key)
-            if data is not None:
+        result = dict_constructor()
+        for key, value in self._get_fields_items():
+            field = self._fields[key]
+            if value is not None:
                 try:
                     kwargs['path'] = self._path
                     serialized_key = self._key_to_source[key]
-                    serialized_data = field.serialize(data, **kwargs)
-                    if serialized_data == {}:
+                    serialized_data = field.serialize(value, **kwargs)
+                    if serialized_data =={}:
                         result[serialized_key] = None
                     else:
                         result[serialized_key] = serialized_data
@@ -360,6 +343,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                                             msg=e.msg)
                     self._errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
+        result.update(self._extra)
         return result
 
     @property
@@ -367,28 +351,28 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         return dict(self._clsfields, **self._extra)
 
     def _get_fields_items(self):
-        return self._data.items()
+        return list(self._data.items())
 
-    def to_dict(self, name_spaces=None, **kwargs):
-        self.validate(**kwargs)
-        result = OrderedDict()
-        self._gen_key_to_from_source(name_spaces)
-        for key, value in self._get_fields_items():
-            if value is not None and key in self._key_to_source:
-                name = self._key_to_source[key]
-                if isinstance(value, Model):
-                    result[name] = value.to_dict(name_spaces=name_spaces)
-                elif (isinstance(value, list) and value and
-                      isinstance(value[0], Model)):
-                    result[name] = [item.to_dict(name_spaces=name_spaces)
-                                    for item in value if value is not None]
-                else:
-                    result[name] = value
-        if self._extra:
-            for name, value in self._extra.items():
-                if value is not None:
-                    result[name] = value
-        return result
+    # def to_dict(self, name_spaces=None, dict_constructor=dict, **kwargs):
+    #     self.validate(**kwargs)
+    #     result = dict_constructor()
+    #     self._gen_key_to_from_source(name_spaces)
+    #     for key, value in self._get_fields_items():
+    #         if value is not None and key in self._key_to_source:
+    #             name = self._key_to_source[key]
+    #             if isinstance(value, Model):
+    #                 result[name] = value.to_dict(name_spaces=name_spaces)
+    #             elif (isinstance(value, list) and value and
+    #                   isinstance(value[0], Model)):
+    #                 result[name] = [item.to_dict(name_spaces=name_spaces)
+    #                                 for item in value if value is not None]
+    #             else:
+    #                 result[name] = value
+    #     if self._extra:
+    #         for name, value in self._extra.items():
+    #             if value is not None:
+    #                 result[name] = value
+    #     return result
 
 
 class AttributeModel(Model):
@@ -401,16 +385,18 @@ class AttributeModel(Model):
         super(AttributeModel, self).__init__()
         if self.required_attributes is None:
             self.required_attributes = []
+        cls_fields = {}
         for name, field in self._clsfields.items():
-            if not field.source:
-                if name == self._value_key:
-                    field.source = '#text'
+            if name == self._value_key:
+                cls_fields[name] = self._clsfields[name]
+                if not cls_fields[name].source:
+                    cls_fields[name].source = '#text'
+            else:
+                if name in self.required_attributes:
+                    cls_fields[name] = RequiredAttribute(field)
                 else:
-                    if name in self.required_attributes:
-                        attribute_field = RequiredAttribute(field)
-                    else:
-                        attribute_field = OptionalAttribute(field)
-                    field.source = attribute_field.get_source(name)
+                    cls_fields[name] = OptionalAttribute(field)
+        self._clsfields = cls_fields
 
     def __setattr__(self, key, value):
         if key == 'required_attributes':
@@ -469,11 +455,30 @@ class SequenceModel(Model):
         return result_sequence
 
     def _get_fields_items(self):
-        attributes = []
-        elements = []
         attribute_keys = set(self._data.keys()) - set(self._data_sequence)
-        for key in attribute_keys:
-            attributes.append((key, self._data[key]))
-        for key in self._data_sequence:
-            elements.append((key, self._data[key]))
+        attributes = [(key, self._data[key]) for key in attribute_keys]
+        elements = [(key, self._data[key]) for key in self._data_sequence]
         return attributes + elements
+
+    # def to_dict(self, name_spaces=None, dict_constructor=OrderedDict, **kwargs):
+    #     return super(SequenceModel, self).to_dict(
+    #         name_spaces, dict_constructor, **kwargs)
+
+    def from_xml(self, raw_data, **kwargs):
+        name_spaces = kwargs.get('name_spaces', {})
+        keys_to_delete = []
+        root_data = next(iter(raw_data.values()))
+        for key, value in root_data.items():
+            if key.startswith('@xmlns'):
+                name_spaces[value] = key.split(':')[1]
+                keys_to_delete.append(key)
+        if 'http://www.w3.org/2001/XMLSchema-instance' in name_spaces:
+            xsi = name_spaces['http://www.w3.org/2001/XMLSchema-instance']
+            schema_location_attr = '@%s:schemaLocation' % xsi
+            if schema_location_attr in root_data:
+                keys_to_delete.append(schema_location_attr)
+        for key in keys_to_delete:
+            del root_data[key]
+        kwargs['errors'] = []
+        kwargs['name_spaces'] = name_spaces
+        return self.populate(root_data, **kwargs)

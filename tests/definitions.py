@@ -45,7 +45,7 @@ class LoadConstraint(AttributeModel):
 class Size(AttributeModel):
     _value_key = 'size_int'
     id = ID()
-    size_int = IntegerField()
+    size_int = IntegerField(min=1)
     format = CharField()
     resolve = CharField(default='resolve')
 
@@ -121,35 +121,45 @@ class Vector(SequenceModel):
     _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
 
 
-class WirePowerDef(SequenceModel):
+class LogicalWirePowerDef(SequenceModel):
     domain = CharField()
     isolation = CharField()
+    idle = CharField()
+    reset = CharField()
     vector = ModelField(Vector)
     _sequence = [
-        Choice(options=[
-            SequenceElement('isolation'),
-            SequenceElement('vector')
-        ]),
         SequenceElement('domain'),
+        SequenceElement('isolation'),
+        SequenceElement('idle'),
+        SequenceElement('reset'),
+        SequenceElement('vector'),
     ]
     _name_space = "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0"
 
 
-class WirePowerDefs(SequenceModel):
-    wirePowerDef = ModelCollectionField(WirePowerDef)
+class LogicalWirePowerDefs(SequenceModel):
+    logicalWirePowerDef = ModelCollectionField(LogicalWirePowerDef)
     _sequence = [
-        SequenceElement('wirePowerDef'),
+        SequenceElement('logicalWirePowerDef'),
     ]
     _name_space = "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0"
 
 
-class WireExtension(SequenceModel):
+class AccelleraLogicalWire(SequenceModel):
     id = OptionalAttribute(ID(name_space="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"))
-    wirePowerDefs = ModelField(WirePowerDefs)
+    logicalWirePowerDefs = ModelField(LogicalWirePowerDefs)
     _sequence = [
-        SequenceElement('wirePowerDefs'),
+        SequenceElement('logicalWirePowerDefs'),
     ]
     _name_space = "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE"
+
+
+class VendorExtensions(SequenceModel):
+    logicalWire = ModelField(AccelleraLogicalWire)
+    _sequence = [
+        SequenceElement('logicalWire'),
+    ]
+    _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
 
 
 class Wire(SequenceModel):
@@ -177,6 +187,7 @@ class Port(SequenceModel):
     description = CharField()
     wire = ModelField(Wire, accept_none=True)
     transactional = CharField()
+    vendorExtensions = ModelField(VendorExtensions)
     _sequence = [
         SequenceElement('logicalName', min_occurs=1),
         SequenceElement('displayName'),
@@ -184,7 +195,8 @@ class Port(SequenceModel):
         Choice(options=[
             SequenceElement('wire', min_occurs=1),
             SequenceElement('transactional', min_occurs=1),
-        ])
+        ]),
+        SequenceElement('vendorExtensions'),
     ]
     _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
 
@@ -200,14 +212,6 @@ class LibraryRef(AttributeModel):
 class Ports(SequenceModel):
     port = ModelCollectionField(Port)
     _sequence = [SequenceElement('port', min_occurs=1)]
-    _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
-
-
-class VendorExtensions(SequenceModel):
-    wire = ModelField(WireExtension)
-    _sequence = [
-        SequenceElement('wire'),
-    ]
     _name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
 
 
