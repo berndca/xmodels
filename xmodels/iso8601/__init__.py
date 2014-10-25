@@ -1,14 +1,10 @@
 from .utility import ParseError
 from .datetimestamps import parse_date, parse_time
-from .durations import parse_duration
-from .intervals import parse_interval
 from .timezones import Timezone
 
 __all__ = ['parse',
            'parse_date',
            'parse_time',
-           'parse_duration',
-           'parse_interval',
            'Timezone',
            'ParseError']
 
@@ -21,11 +17,4 @@ def parse(representation):
     Return value is specific to ``representation``.
     """
     representation = str(representation).upper().strip()
-
-    if '/' in representation:
-        return parse_interval(representation)
-
-    if representation[0] is 'P':
-        return parse_duration(representation)
-
     return parse_date(representation)

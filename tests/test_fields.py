@@ -11,9 +11,7 @@ from xmodels.fields import IntegerField, BooleanField, \
     Language, NMTOKEN, RangeField, FloatField, NonNegativeInteger, \
     PositiveInteger, NegativeInteger, EnumField, DateTimeField, DateField, \
     TimeField, OptionalAttribute, RequiredAttribute
-
-
-__author__ = 'bernd'
+from xmodels.iso8601 import Timezone
 
 
 def test_validation_exception():
@@ -33,6 +31,10 @@ class TestBaseField():
         test = self.cls(CharField())
         assert str(test) == 'TestBF'
 
+    def test_base_field_repr_no_data(self):
+        test = self.cls(CharField())
+        assert repr(test) == 'TestBF'
+
     def test_base_field_required_fail(self):
         test = self.cls(CharField())
         with pytest.raises(ValidationException):
@@ -51,6 +53,17 @@ class TestBaseField():
         inst1 = RequiredAttribute(CharField())
         inst2 = OptionalAttribute(CharField())
         assert inst1 != inst2
+
+    def test_empty_fail(self):
+        inst1 = RequiredAttribute(CharField())
+        with pytest.raises(ValidationException) as exc_info:
+            inst1.validate(None)
+        assert exc_info.value.msg == inst1.messages['required']
+
+    def test_name_space_kwarg(self):
+        name_space="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        id = OptionalAttribute(CharField(name_space=name_space))
+        assert id.name_space == name_space
 
 
 class TestAttribute():
@@ -84,6 +97,10 @@ class TestAttribute():
     def test_is_attribute(self):
         assert self.instance.isAttribute
 
+
+def test_required_attribute_full_source():
+    attr = RequiredAttribute(CharField(source='@id'))
+    assert attr.get_source('test') == '@id'
 
 class TestCharField():
     @classmethod
@@ -377,6 +394,21 @@ class TestFloatField():
             self.instance.deserialize('invalid')
         assert exc_info.value.msg == self.instance.messages['invalid']
 
+    def test_serialize_no_format(self):
+        self.instance.serial_format = None
+        assert self.instance.serialize(3.14) == '3.14'
+
+    def test_serialize_basic_format(self):
+        self.instance.serial_format = '{:e}'
+        assert self.instance.serialize(3.14) == '3.140000e+00'
+
+    def test_serialize_basic_fail(self):
+        self.instance.serial_format = '{invalid}'
+        with pytest.raises(ValidationException) as exc_info:
+            self.instance.serialize('3.14')
+        assert exc_info.value.msg == self.instance.messages['format'] %dict(
+            format=self.instance.serial_format)
+
 
 class TestBooleanField():
     @classmethod
@@ -411,6 +443,14 @@ class TestBooleanField():
         actual = self.instance.deserialize(False)
         assert actual is False
 
+    def test_boolean_field_bool_serialize_true(self):
+        actual = self.instance.serialize(True)
+        assert actual == 'true'
+
+    def test_boolean_field_bool_serialize_false(self):
+        actual = self.instance.serialize(0)
+        assert actual == 'false'
+
 
 class TestEnumField():
     @classmethod
@@ -444,7 +484,7 @@ class TestEnumField():
         assert exc_info.value.msg == message
 
 
-class TestDateTimeFieldTestCase():
+class TestFormattedDateTimeField():
     @classmethod
     def setup_class(cls):
         cls.serial_format = "%a %b %d %H:%M:%S +0000 %Y"
@@ -452,8 +492,6 @@ class TestDateTimeFieldTestCase():
         cls.field = DateTimeField(serial_format=cls.serial_format)
 
     def test_format_conversion_to_python(self):
-        import datetime
-
         self.field.deserialize(self.datetimestring)
         converted = self.field.deserialize(self.datetimestring)
         assert isinstance(converted, datetime.datetime)
@@ -463,108 +501,211 @@ class TestDateTimeFieldTestCase():
         converted = self.field.deserialize(self.datetimestring)
         assert converted.strftime(self.serial_format) == self.datetimestring
 
-    def test_iso8601_conversion_z(self):
-        import datetime
-        from xmodels.PySO8601 import Timezone
+    def test_datetime_serialize(self):
+        datetime_input = datetime.datetime(1989, 11, 9, 15,
+                                           tzinfo=Timezone("+01:00"))
+        result = self.field.serialize(datetime_input)
+        assert result == 'Thu Nov 09 15:00:00 +0000 1989'
 
+
+class TestISO8601DateTimeField():
+
+    def test_conversion_z(self):
         dt_field = DateTimeField()
-        dt_field.deserialize("2010-07-13T14:01:00Z")
         expected = datetime.datetime(2010, 7, 13, 14, 1, 0,
                                      tzinfo=Timezone())
         assert expected == dt_field.deserialize("2010-07-13T14:01:00Z")
 
-    def test_iso8601_conversion_0(self):
-        import datetime
-        from xmodels.PySO8601 import Timezone
-
+    def test_conversion_0(self):
         dt_field = DateTimeField()
-        dt_field.deserialize("2010-07-13T14:02:00-05:00")
         expected = datetime.datetime(2010, 7, 13, 14, 2, 0,
                                      tzinfo=Timezone("-05:00"))
         assert expected == dt_field.deserialize("2010-07-13T14:02:00-05:00")
 
-    def test_iso8601_conversion_1(self):
-        import datetime
-        from xmodels.PySO8601 import Timezone
-
+    def test_conversion_1(self):
         dt_field = DateTimeField()
-        dt_field.deserialize("2010-07-13T14:03:00+05:30")
         expected = datetime.datetime(2010, 7, 13, 14, 3, 0,
                                      tzinfo=Timezone("05:30"))
         assert expected == dt_field.deserialize("2010-07-13T14:03:00+05:30")
 
-    def test_datetime_input(self):
-        import datetime
-        from xmodels.PySO8601 import Timezone
+    def test_conversion_2(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2011, 1, 13, 16, 44, 00, tzinfo=Timezone())
+        assert expected == dt_field.deserialize("20110113T164400Z")
 
+    def test_conversion_3(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2011, 1, 13, 16, 44, 00, tzinfo=Timezone())
+        assert expected == dt_field.deserialize("20110113T1644Z")
+
+    def test_conversion_4(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2011, 1, 13, 16, 44, 00)
+        assert expected == dt_field.deserialize("20110113T164400")
+
+    def test_conversion_5(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2011, 1, 13, 16, 44, 00)
+        assert expected == dt_field.deserialize("20110113T1644")
+
+    def test_conversion_6(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2010, 2, 1)
+        assert expected == dt_field.deserialize("2010W052")
+
+    def test_conversion_7(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2010, 2, 1, 12, 1, 15, 2,
+                                     tzinfo=Timezone())
+        assert expected == dt_field.deserialize("2010W052T120115.002Z")
+
+    def test_conversion_8(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2010, 8, 22)
+        assert expected == dt_field.deserialize("2010234")
+
+    def test_conversion_9(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2010, 8, 22, 15, 52, 42, 763)
+        assert expected == dt_field.deserialize("2010234T155242.763")
+
+    def test_conversion_a(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2007, 1, 2)
+        assert expected == dt_field.deserialize("20070102")
+
+    def test_conversion_b(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2007, 1, 2)
+        assert expected == dt_field.deserialize("070102")
+
+    def test_conversion_c(self):
+        dt_field = DateTimeField()
+        expected = datetime.datetime(2007, 1, 1)
+        assert expected == dt_field.deserialize("2007")
+
+    def test_conversion_d(self):
+        dt_field = DateTimeField()
+        today = datetime.date.today()
+        expected = datetime.datetime(today.year, today.month, today.day,
+                                     16, 47, 21)
+        assert expected == dt_field.deserialize('16:47:21')
+
+    def test_datetime_input(self):
         datetime_input = datetime.datetime(1989, 11, 9, 15,
                                            tzinfo=Timezone("+01:00"))
         result = DateTimeField().deserialize(datetime_input)
         assert result == datetime_input
 
+    def test_datetime_serialize_isoformat(self):
+        datetime_input = datetime.datetime(1989, 11, 9, 15,
+                                           tzinfo=Timezone("+01:00"))
+        result = DateTimeField().serialize(datetime_input)
+        assert result == '1989-11-09T15:00:00+01:00'
+
+    def test_timezone_repr(self):
+        tz = Timezone('-07:00')
+        assert repr(tz) == '<Timezone UTC-07:00>'
+
+    def test_timezone_str(self):
+        tz = Timezone('-07:00')
+        assert str(tz) == 'UTC-07:00'
+
 
 class TestDateFieldTestCase():
     @classmethod
     def setup_class(cls):
-        cls.serial_format = "%Y-%m-%d"
+        cls.serial_format = "%Y-%b-%d"
         cls.datestring = "2010-12-28"
         cls.field = DateField(serial_format=cls.serial_format)
 
     def test_datetime_input(self):
-        import datetime
-        from xmodels.PySO8601 import Timezone
-
         datetime_input = datetime.datetime(1989, 11, 9,
                                            tzinfo=Timezone("+01:00"))
-        result = DateField().deserialize(datetime_input)
+        result = self.field.deserialize(datetime_input)
+        assert result == datetime_input.date()
+
+    def test_date_input(self):
+        datetime_input = datetime.date(1989, 11, 9)
+        result = self.field.deserialize(datetime_input)
         assert result == datetime_input
 
-    def test_format_conversion(self):
-        import datetime
+    def test_date_input_isoformat(self):
+        result = DateField().deserialize('1989-11-09')
+        assert result == datetime.date(1989, 11, 9)
 
-        dt = self.field.deserialize(self.datestring)
-        assert isinstance(dt, datetime.date)
-        assert dt.strftime(self.serial_format) == self.datestring
+    def test_date_input_fail_parse(self):
+        with pytest.raises(ValidationException):
+            DateField().deserialize('not a date')
+
+    def test_date_input_fail_value(self):
+        with pytest.raises(ValidationException):
+            self.field.deserialize('not a date')
+
+    def test_format_serialize_default(self):
+        date_str = DateField().serialize(datetime.date(1989, 11, 9))
+        assert date_str == '1989-11-09'
+
+    def test_format_serialize_format(self):
+        date_str = self.field.serialize(datetime.date(1989, 11, 9))
+        assert date_str == '1989-Nov-09'
 
 
 class TestTimeField():
     @classmethod
     def setup_class(cls):
-        cls.format = "%H:%M:%S"
-        cls.timestring = "09:33:30"
-        cls.field = TimeField(format=cls.format)
+        cls.format = "%H.%M.%S"
+        cls.timestring = "09.33.30"
+        cls.field = TimeField(serial_format=cls.format)
 
     def test_format_conversion(self):
-        import datetime
-
         t = self.field.deserialize(self.timestring)
         assert isinstance(t, datetime.time)
         assert t.strftime(self.format) == self.timestring
 
     def test_iso8601_conversion(self):
-        import datetime
-
         tf = TimeField()
         t = tf.deserialize("09:33:30")
         expected = datetime.time(9, 33, 30)
         assert expected == t
 
-    def test_datetime_time(self):
-        import datetime
+    def test_value_fail(self):
+        with pytest.raises(ValidationException):
+            self.field.deserialize("not a time")
 
+    def test_parse_fail(self):
+        with pytest.raises(ValidationException):
+            TimeField().deserialize("not a time")
+
+    def test_datetime_time(self):
         tf = TimeField()
         t = tf.deserialize(datetime.time(9, 33, 30))
         expected = datetime.time(9, 33, 30)
         assert expected == t
 
     def test_datetime(self):
-        import datetime
-
-        tf = TimeField()
         dt = datetime.datetime(1989, 11, 9, 9, 33, 30)
-        t = tf.deserialize(dt)
-        expected = datetime.time(9, 33, 30)
-        assert expected == t
+        assert self.field.deserialize(dt) == datetime.time(9, 33, 30)
+
+    def test_serialize_default(self):
+        assert TimeField().serialize(datetime.time(9, 33, 30)) == "09:33:30"
+
+    def test_serialize_format(self):
+        assert self.field.serialize(datetime.time(9, 33, 30)) == "09.33.30"
+
+
+
+class TestTimeFieldISO8601():
+
+    def test_time_colons(self):
+        assert TimeField().deserialize('16:47:21') == datetime.time(16, 47, 21)
+
+    def test_time_just_digits(self):
+        assert TimeField().deserialize('164721') == datetime.time(16, 47, 21)
+
+    def test_time_just_digits2(self):
+        expected = datetime.time(16, 47, 21, 854)
+        assert TimeField().deserialize('16:47:21.854Z') == expected
 
 
 class TestModelFieldBasic():
@@ -586,11 +727,11 @@ class TestModelFieldBasic():
         assert instance.first == 0
 
     def test_model_field_converted(self):
-        import datetime
-        from xmodels.PySO8601 import Timezone
+        from xmodels.iso8601 import Timezone
 
         field = ModelField(IsASubModel)
         instance = field.deserialize(dict(dt="2010-07-13T14:03:00+05:30"))
+
         assert instance.dt == datetime.datetime(
             2010, 7, 13, 14, 3, 0, tzinfo=Timezone("05:30"))
 
@@ -609,6 +750,14 @@ class TestModelFieldBasic():
     def test_get_name_space_none(self):
         inst = ModelField(VLNVAttributes)
         assert inst.name_space is None
+
+    def test_serialize(self):
+        mc = ModelField(IsASubModel)
+        sm = IsASubModel()
+        sm.first = 1
+        sm.dt = datetime.datetime(1973, 9, 11, 5)
+        actual = mc.serialize(sm)
+        assert actual == {'dt': '1973-09-11T05:00:00', 'first': 1}
 
 
 class TestHierarchicalModelFieldCreation():
@@ -664,10 +813,6 @@ class TestModelCollectionField():
         data = {'first': [{'first': '42'}, {'first': '1989'}]}
         instance = HasAModelCollectionField.from_dict(data)
         assert isinstance(instance.first, list)
-        # for item in instance.first:
-        # self.assertTrue(isinstance(item, IsASubModel))
-        # self.assertEqual(instance.first[0].first, data['first'][0]['first'])
-        # self.assertEqual(instance.first[1].first, data['first'][1]['first'])
 
     def test_model_collection_field_with_no_elements(self):
         class IsASubModel(Model):
@@ -680,7 +825,22 @@ class TestModelCollectionField():
         instance = HasAModelCollectionField.from_dict(data)
         assert instance.first == []
 
-    def test_model_collection_to_dict(self):
+    def test_serialize(self):
+        mc = ModelCollectionField(IsASubModel)
+        sm = [IsASubModel(), IsASubModel()]
+        sm[0].first = 1
+        sm[0].dt = datetime.datetime(1973, 9, 11, 5)
+        sm[1].first= 42
+        sm[1].dt = datetime.datetime(1945, 8, 9, 11, 2)
+        actual = mc.serialize(sm)
+        assert actual == [
+            {'dt': '1973-09-11T05:00:00', 'first': 1},
+            {'dt': '1945-08-09T11:02:00', 'first': 42}
+        ]
+
+class TestModelCollectionFieldFromDict():
+    @classmethod
+    def setup_class(cls):
         class Post(Model):
             title = CharField()
             created = DateTimeField()
@@ -700,12 +860,25 @@ class TestModelCollectionField():
             ]
         }
 
-        eric = User.from_dict(data)
-        assert len(eric.posts) == 2
-        assert eric.posts[1].title == 'Post #2'
-        assert eric.posts[0].title == 'Post #1'
+        cls.eric = User.from_dict(data)
+        cls.eric.deserialize()
+
+    def test_str(self):
+        assert str(self.eric) == "User: 'name': CharField, " \
+                                 "'posts': ModelCollectionField: Post"
+
+    def test_len_posts(self):
+        assert len(self.eric.posts) == 2
+
+    def test_title_1(self):
+        assert self.eric.posts[1].title == 'Post #2'
+
+    def test_title_0(self):
+        assert self.eric.posts[0].title == 'Post #1'
+
+    def test_created_1(self):
         expected = datetime.datetime(2010, 7, 13, 14, 3)
-        assert eric.posts[1].created == expected
+        assert self.eric.posts[1].created == expected
 
 class TestFieldCollectionFieldBasic():
 
@@ -718,6 +891,10 @@ class TestFieldCollectionFieldBasic():
         cf = FieldCollectionField(IntegerField())
         actual = cf.deserialize(data)
         assert actual == [1, 2, 3]
+
+    def test_constructor_fail(self):
+        with pytest.raises(TypeError):
+            FieldCollectionField('invalid')
 
     def test_date_time_single(self):
         dt_list = FieldCollectionField(DateTimeField())
@@ -747,3 +924,12 @@ class TestFieldCollectionFieldBasic():
         inst = ModelCollectionField(VLNVAttributes)
         assert inst.name_space is None
 
+    def test_serialize_floats(self):
+        field = FieldCollectionField(FloatField(serial_format='{0:.3f}'))
+        result = field.serialize([1, 2, 3])
+        assert result == ['1.000', '2.000', '3.000']
+
+    def test_serialize_single_float(self):
+        field = FieldCollectionField(FloatField(serial_format='{0:.3f}'))
+        result = field.serialize(4)
+        assert result == ['4.000']

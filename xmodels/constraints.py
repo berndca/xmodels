@@ -147,8 +147,8 @@ def get_value_path_stores(**kwargs):
     stores = kwargs.get('stores')
     path = kwargs.get('path')
     if stores is not None:
-        assert isinstance(stores, Stores), messages['store']
-    # assert path, messages['path']
+        if not isinstance(stores, Stores):
+            raise TypeError(messages['store'])
     return path, stores
 
 
