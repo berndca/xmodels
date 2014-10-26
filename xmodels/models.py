@@ -186,16 +186,18 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         allow_extra_elements = False
         allow_extra_attributes = False
 
+        def __init__(self):
+            self.errors = []
+            self.path = ''
+            self.source_to_key = None
+            self.non_empty_fields = set([])
 
     def __init__(self):
         self._extra = {}
-        self._errors = []
         self._data = {}
-        self._path = ''
-        self._source_to_key = None
         self._defaults = {key: field.default for key, field in
                           self._clsfields.items() if field.default is not None}
-        self._non_empty_fields = set([])
+        object.__setattr__(self, 'meta_inst', Model.Meta())
 
     def __str__(self):
         return '%s: %s' % (self.__class__.__name__,
@@ -214,10 +216,12 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         return data
 
     def __setattr__(self, key, value):
+        if key == 'meta_inst':
+            setattr(self.meta_inst, key, value)
         if key in self._clsfields.keys():
             self._data[key] = value
             if value is not None:
-                self._non_empty_fields.add(key)
+                self.meta_inst.non_empty_fields.add(key)
         elif key.startswith('_'):
             self.__dict__[key] = value
         elif key[0] == '@' and self.Meta.allow_extra_attributes:
@@ -243,19 +247,19 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         return instance
 
     def _gen_key_to_from_source(self, name_spaces):
-        self._source_to_key = {}
+        self.meta_inst.source_to_key = {}
         default_prefix = ''
         if name_spaces and self._name_space in name_spaces:
             default_prefix = ''.join([name_spaces[self._name_space], ':'])
         for key, field in self._clsfields.items():
             source = field.get_source(key, name_spaces, default_prefix)
-            self._source_to_key[source] = key
+            self.meta_inst.source_to_key[source] = key
         self._key_to_source = {value: key for key, value in
-                               self._source_to_key.items()}
+                               self.meta_inst.source_to_key.items()}
 
     def _find_field(self, name):
-        if name in self._source_to_key:
-            key = self._source_to_key[name]
+        if name in self.meta_inst.source_to_key:
+            key = self.meta_inst.source_to_key[name]
             if key in self._fields:
                 return key
 
@@ -273,7 +277,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
 
     def populate(self, data, **kwargs):
         name_spaces = kwargs.get('name_spaces')
-        self._non_empty_fields = set([])
+        self.meta_inst.non_empty_fields = set([])
         self._gen_key_to_from_source(name_spaces)
         for name, value in data.items():
             key = self._find_field(name)
@@ -281,7 +285,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                 field = self._clsfields[key]
                 if value is not None or field.accept_none:
                     if key is not None:
-                        self._non_empty_fields.add(key)
+                        self.meta_inst.non_empty_fields.add(key)
                 if isinstance(field, WrappedObjectField):
                     self._data[key] = field.populate(value, **kwargs)
                 else:
@@ -290,23 +294,23 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                 self._extra[name] = value
 
     def validate(self, **kwargs):
-        self._path = self._build_path(**kwargs)
+        self.meta_inst.path = self._build_path(**kwargs)
         for key, field in self._clsfields.items():
             data = self._data.get(key)
             if data is not None:
                 try:
-                    kwargs['path'] = self._path
+                    kwargs['path'] = self.meta_inst.path
                     self._data[key] = field.validate(data, **kwargs)
                 except ValidationException as e:
-                    msg_rec = MessageRecord(path=self._path, field=key,
+                    msg_rec = MessageRecord(path=self.meta_inst.path, field=key,
                                             msg=e.msg)
-                    self._errors.append(msg_rec)
+                    self.meta_inst.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
         if self._extra and not \
                 (self.Meta.allow_extra_elements or self.Meta.allow_extra_attributes):
             msg = 'Found extra fields: %s' % ','.join(self._extra.keys())
-            msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
-            self._errors.append(msg_rec)
+            msg_rec = MessageRecord(path=self.meta_inst.path, field='_extra', msg=msg)
+            self.meta_inst.errors.append(msg_rec)
             error(logger, msg_rec, **kwargs)
         return self
 
@@ -315,12 +319,12 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
             data = self._data.get(key)
             if data is not None:
                 try:
-                    kwargs['path'] = self._path
+                    kwargs['path'] = self.meta_inst.path
                     self._data[key] = field.deserialize(data, **kwargs)
                 except ValidationException as e:
-                    msg_rec = MessageRecord(path=self._path, field=key,
+                    msg_rec = MessageRecord(path=self.meta_inst.path, field=key,
                                             msg=e.msg)
-                    self._errors.append(msg_rec)
+                    self.meta_inst.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
         return self
 
@@ -333,7 +337,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
             field = self._fields[key]
             if value is not None:
                 try:
-                    kwargs['path'] = self._path
+                    kwargs['path'] = self.meta_inst.path
                     serialized_key = self._key_to_source[key]
                     serialized_data = field.serialize(value, **kwargs)
                     if serialized_data =={}:
@@ -341,9 +345,9 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                     else:
                         result[serialized_key] = serialized_data
                 except ValidationException as e:
-                    msg_rec = MessageRecord(path=self._path, field=key,
+                    msg_rec = MessageRecord(path=self.meta_inst.path, field=key,
                                             msg=e.msg)
-                    self._errors.append(msg_rec)
+                    self.meta_inst.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
         result.update(self._extra)
         return result
@@ -422,14 +426,14 @@ class SequenceModel(Model):
         self._data_sequence = None
 
     def validate(self, **kwargs):
-        self._path = self._build_path(**kwargs)
+        self.meta_inst.path = self._build_path(**kwargs)
         if self._initial is not None:
             if kwargs.get('stores') is None:
                 kwargs['stores'] = Stores()
-            self._initial.add_keys(path=self._path, stores=kwargs['stores'])
+            self._initial.add_keys(path=self.meta_inst.path, stores=kwargs['stores'])
         super(SequenceModel, self).validate(**kwargs)
         element_tags = []
-        for tag in self._non_empty_fields:
+        for tag in self.meta_inst.non_empty_fields:
             if tag in self._fields and self._data[tag] is not None:
                 field = self._fields[tag]
                 if not field.isAttribute:
@@ -445,9 +449,9 @@ class SequenceModel(Model):
                     result_sequence.append(field.tag)
                 elif field.required:
                     msg = "Missing required key: %s %s" % (field.tag, path)
-                    msg_rec = MessageRecord(path=self._path, field=field.tag,
+                    msg_rec = MessageRecord(path=self.meta_inst.path, field=field.tag,
                                             msg=msg)
-                    self._errors.append(msg_rec)
+                    self.meta_inst.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
             elif isinstance(field, Choice):
                 choice_keys_sey = set(value_tags) & field.all_keys_set
@@ -457,8 +461,8 @@ class SequenceModel(Model):
         extra_tags = [tag for tag in value_tags if tag not in result_sequence]
         if extra_tags:
             msg = "Could not match tag(s): %s" % ', '.join(extra_tags)
-            msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
-            self._errors.append(msg_rec)
+            msg_rec = MessageRecord(path=self.meta_inst.path, field='_extra', msg=msg)
+            self.meta_inst.errors.append(msg_rec)
             error(logger, msg_rec, **kwargs)
         return result_sequence
 

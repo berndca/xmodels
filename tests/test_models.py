@@ -40,7 +40,7 @@ class TestElementNoAttributes(object):
         cls.instance = Register.from_dict(cls.register_dict)
 
     def test_pass(self):
-        assert self.instance._errors == []
+        assert self.instance.meta_inst.errors == []
 
     def test_address_offset(self):
         assert self.instance.addressOffset == 0
@@ -392,26 +392,26 @@ class TestNameSpacePrefix():
         assert self.lwpDefs[1].vector.right == 0
 
     def test_root_path(self):
-        assert self.inst._path == 'VendorExtensions'
+        assert self.inst.meta_inst.path == 'VendorExtensions'
 
     def test_wire_path(self):
-        assert self.inst.logicalWire._path == \
+        assert self.inst.logicalWire.meta_inst.path == \
                'VendorExtensions.AccelleraLogicalWire'
 
     def test_wire_power_defs_path(self):
-        assert self.inst.logicalWire.logicalWirePowerDefs._path == \
+        assert self.inst.logicalWire.logicalWirePowerDefs.meta_inst.path == \
                'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs'
 
     def test_wire_power_def0_path(self):
-        assert self.lwpDefs[0]._path == \
+        assert self.lwpDefs[0].meta_inst.path == \
                'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs.LogicalWirePowerDef[0]'
 
     def test_wire_power_def1_path(self):
-        assert self.lwpDefs[1]._path == \
+        assert self.lwpDefs[1].meta_inst.path == \
                'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs.LogicalWirePowerDef[1]'
 
     def test_vector_path(self):
-        assert self.lwpDefs[1].vector._path == \
+        assert self.lwpDefs[1].vector.meta_inst.path == \
                'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs.LogicalWirePowerDef[1].Vector'
 
     def test_do_dict(self):
