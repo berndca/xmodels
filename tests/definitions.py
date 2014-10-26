@@ -43,11 +43,13 @@ class LoadConstraint(AttributeModel):
 
 
 class Size(AttributeModel):
-    _value_key = 'size_int'
     id = ID()
     size_int = IntegerField(min=1)
     format = CharField()
     resolve = CharField(default='resolve')
+
+    class Meta(AttributeModel.Meta):
+        value_key = 'size_int'
 
 
 class HierarchicalSequenceModel(SequenceModel):

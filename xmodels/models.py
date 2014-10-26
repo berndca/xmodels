@@ -182,8 +182,10 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
 
     """
 
-    _allow_extra_elements = False
-    _allow_extra_attributes = False
+    class Meta:
+        allow_extra_elements = False
+        allow_extra_attributes = False
+
 
     def __init__(self):
         self._extra = {}
@@ -218,9 +220,9 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                 self._non_empty_fields.add(key)
         elif key.startswith('_'):
             self.__dict__[key] = value
-        elif key[0] == '@' and self._allow_extra_attributes:
+        elif key[0] == '@' and self.Meta.allow_extra_attributes:
             self._extra[key] = value
-        elif key[0] != '@' and self._allow_extra_elements:
+        elif key[0] != '@' and self.Meta.allow_extra_elements:
             self._extra[key] = value
         else:
             raise AttributeError
@@ -301,7 +303,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                     self._errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
         if self._extra and not \
-                (self._allow_extra_elements or self._allow_extra_attributes):
+                (self.Meta.allow_extra_elements or self.Meta.allow_extra_attributes):
             msg = 'Found extra fields: %s' % ','.join(self._extra.keys())
             msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
             self._errors.append(msg_rec)
@@ -378,36 +380,42 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
 class AttributeModel(Model):
     """Used to describe elements with attributes and no children.
     """
-    _value_key = 'value'
-    required_attributes = None
+
+    class Meta(Model.Meta):
+        value_key = 'value'
+        required_attributes = None
 
     def __init__(self):
         super(AttributeModel, self).__init__()
-        if self.required_attributes is None:
-            self.required_attributes = []
+        if self.Meta.required_attributes is None:
+            self.Meta.required_attributes = []
         cls_fields = {}
         for name, field in self._clsfields.items():
-            if name == self._value_key:
+            if name == self.Meta.value_key:
                 cls_fields[name] = self._clsfields[name]
                 if not cls_fields[name].source:
                     cls_fields[name].source = '#text'
             else:
-                if name in self.required_attributes:
+                if name in self.Meta.required_attributes:
                     cls_fields[name] = RequiredAttribute(field)
                 else:
                     cls_fields[name] = OptionalAttribute(field)
         self._clsfields = cls_fields
 
-    def __setattr__(self, key, value):
-        if key == 'required_attributes':
-            self.__dict__[key] = value
-        else:
-            return super(AttributeModel, self).__setattr__(key, value)
+    # def __setattr__(self, key, value):
+    #     if key == 'required_attributes':
+    #         self.__dict__[key] = value
+    #     else:
+    #         return super(AttributeModel, self).__setattr__(key, value)
 
 
 class SequenceModel(Model):
     _initial = None
     _sequence = None
+
+    class Meta(Model.Meta):
+        initial = None
+        sequence = None
 
     def __init__(self):
         super(SequenceModel, self).__init__()

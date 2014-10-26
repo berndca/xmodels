@@ -147,12 +147,15 @@ class TestModelExtra(object):
     @classmethod
     def setup_class(cls):
         class Extras(Model):
-            _allow_extra_elements = True
-            _allow_extra_attributes = True
             id = OptionalAttribute(CharField())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
+
+
+            class Meta:
+                allow_extra_elements = True
+                allow_extra_attributes = True
 
         cls.cls = Extras
         cls.instance = Extras()
