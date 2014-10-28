@@ -24,11 +24,13 @@ class TestElementNoAttributes(object):
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
-            _sequence = [
-                SequenceElement('name', min_occurs=1),
-                SequenceElement('addressOffset', min_occurs=1),
-                SequenceElement('size', min_occurs=1),
-            ]
+
+            class Meta:
+                sequence = [
+                    SequenceElement('name', min_occurs=1),
+                    SequenceElement('addressOffset', min_occurs=1),
+                    SequenceElement('size', min_occurs=1),
+                ]
 
         cls.register_dict = {
             'name': 'TestRegister',
@@ -40,7 +42,7 @@ class TestElementNoAttributes(object):
         cls.instance = Register.from_dict(cls.register_dict)
 
     def test_pass(self):
-        assert self.instance._errors == []
+        assert self.instance._meta.errors == []
 
     def test_address_offset(self):
         assert self.instance.addressOffset == 0
@@ -114,7 +116,7 @@ class TestElementWithAttributes(object):
         assert self.instance.size.resolve == 'resolve'
 
     def test_str(self):
-        assert str(self.instance) == "Register: 'addressOffset': IntegerField, " \
+        assert str(self.instance) == "Register(Model): 'addressOffset': IntegerField, " \
                                      "'id': OptionalAttribute, " \
                                      "'name': CharField, " \
                                      "'size': ModelField: Size"
@@ -147,12 +149,14 @@ class TestModelExtra(object):
     @classmethod
     def setup_class(cls):
         class Extras(Model):
-            _allow_extra_elements = True
-            _allow_extra_attributes = True
             id = OptionalAttribute(CharField())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
+
+            class Meta:
+                allow_extra_elements = True
+                allow_extra_attributes = True
 
         cls.cls = Extras
         cls.instance = Extras()
@@ -481,14 +485,16 @@ class TestSequenceModels():
             key_names = ['systemGroupNameKey']
 
         class Sequence0(SequenceModel):
-            _initial = InitSystemGroupKey()
             id = OptionalAttribute(ID())
             name = Name()
             size = IntegerField(min=1)
-            _sequence = [
-                SequenceElement('name', min_occurs=1),
-                SequenceElement('size', min_occurs=1),
-            ]
+
+            class Meta:
+                initial = InitSystemGroupKey()
+                sequence = [
+                    SequenceElement('name', min_occurs=1),
+                    SequenceElement('size', min_occurs=1),
+                ]
 
         cls.cls = Sequence0
 
@@ -540,10 +546,12 @@ class TestSerialize():
         class Basic(SequenceModel):
             zzz = IntegerField()
             a = IntegerField()
-            _sequence = [
-                SequenceElement('zzz'),
-                SequenceElement('a'),
-            ]
+
+            class Meta:
+                sequence = [
+                    SequenceElement('zzz'),
+                    SequenceElement('a'),
+                ]
 
         cls.inst = Basic.from_dict(dict(zzz=22, a=999))
 

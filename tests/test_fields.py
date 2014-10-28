@@ -739,7 +739,7 @@ class TestModelFieldBasic():
         assert str(ModelField(IsASubModel)) == 'ModelField: IsASubModel'
 
     def test_model_field_model_str(self):
-        assert str(self.deserialized) == "IsASubModel: 'dt': DateTimeField, " \
+        assert str(self.deserialized) == "IsASubModel(Model): 'dt': DateTimeField, " \
                                          "'first': IntegerField"
 
     def test_get_name_space(self):
@@ -864,7 +864,7 @@ class TestModelCollectionFieldFromDict():
         cls.eric.deserialize()
 
     def test_str(self):
-        assert str(self.eric) == "User: 'name': CharField, " \
+        assert str(self.eric) == "User(Model): 'name': CharField, " \
                                  "'posts': ModelCollectionField: Post"
 
     def test_len_posts(self):

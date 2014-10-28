@@ -16,18 +16,58 @@ def error(logger_inst, message, **kwargs):
     kwargs['errors'].append(message)
     logger_inst.error(message)
 
+from django.db.models import base
+
+
+class Options(object):
+    def __init__(self, meta):
+        self.errors = None
+        self.key_to_source = None
+        self.source_to_key = None
+        self.allow_extra_elements = False
+        self.allow_extra_attributes = False
+        if meta:
+            for key, value in meta.__dict__.items():
+                self.__dict__[key] = value
+
 
 class ModelType(type):
     """Creates the metaclass for Model. The main function of this metaclass
     is to move all of fields into the _fields variable on the class.
 
     """
-    def __init__(cls, name, bases, attrs):
-        cls._clsfields = {}
+
+    def __new__(cls, name, bases, attrs):
+        super_new = super(ModelType, cls).__new__
+
+        if not any(b for b in bases if isinstance(b, ModelType)):
+            return super_new(cls, name, bases, attrs)
+
+        module = attrs.pop('__module__')
+        new_class = super_new(cls, name, bases, {'__module__': module})
+        new_class._clsfields = {}
+        new_class._extra = None
+        new_class._data = None
+        new_class._non_empty_fields = None
+        new_class._defaults = {}
         for key, value in attrs.items():
             if isinstance(value, BaseField):
-                cls._clsfields[key] = value
-                delattr(cls, key)
+                new_class._clsfields[key] = value
+        for key in new_class._clsfields.keys():
+            attrs.pop(key, None)
+        for key, field in new_class._clsfields.items():
+            if field.default is not None:
+                new_class._defaults[key] = field.default
+        base_meta = getattr(new_class, 'Meta', {})
+        attr_meta = attrs.pop('Meta', None)
+        if attr_meta:
+            for key, value in attr_meta.__dict__.items():
+                setattr(base_meta, key, value)
+        new_class._meta = Options(base_meta)
+        # Add all attributes to the class.
+        for obj_name, obj in attrs.items():
+            setattr(new_class, obj_name, obj)
+        return new_class
 
 
 class SequenceElement(CommonEqualityMixin):
@@ -140,7 +180,7 @@ class Choice(CommonEqualityMixin):
                 if tag in self._flat_options]
 
 
-class Model(with_metaclass(ModelType, CommonEqualityMixin)):
+class Model(with_metaclass(ModelType)):
     """The Model is the main component of micromodels. Model makes it trivial
     to parse data from many sources, including JSON APIs.
 
@@ -181,22 +221,22 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
     value are just set on the instance like any other assignment in Python.
 
     """
+    id = 'Model'
 
-    _allow_extra_elements = False
-    _allow_extra_attributes = False
+    class Meta:
+        allow_extra_elements = False
+        allow_extra_attributes = False
+
 
     def __init__(self):
         self._extra = {}
-        self._errors = []
         self._data = {}
+        self._meta.errors = []
         self._path = ''
-        self._source_to_key = None
-        self._defaults = {key: field.default for key, field in
-                          self._clsfields.items() if field.default is not None}
         self._non_empty_fields = set([])
 
     def __str__(self):
-        return '%s: %s' % (self.__class__.__name__,
+        return '%s(%s): %s' % (self.__class__.__name__, self.__class__.__base__.__name__,
                            ', '.join(["'%s': %s" % (k, v) for k, v in
                                       sorted(self._fields.items())]))
 
@@ -212,15 +252,17 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         return data
 
     def __setattr__(self, key, value):
+        # if key == '_meta':
+        #     setattr(self._meta, key, value)
         if key in self._clsfields.keys():
             self._data[key] = value
             if value is not None:
                 self._non_empty_fields.add(key)
         elif key.startswith('_'):
             self.__dict__[key] = value
-        elif key[0] == '@' and self._allow_extra_attributes:
+        elif key[0] == '@' and self._meta.allow_extra_attributes:
             self._extra[key] = value
-        elif key[0] != '@' and self._allow_extra_elements:
+        elif key[0] != '@' and self._meta.allow_extra_elements:
             self._extra[key] = value
         else:
             raise AttributeError
@@ -240,20 +282,24 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
         instance.validate(**kwargs)
         return instance
 
+    def basic_from_dict(self, raw_data, **kwargs):
+        self.populate(raw_data, **kwargs)
+        self.validate(**kwargs)
+
     def _gen_key_to_from_source(self, name_spaces):
-        self._source_to_key = {}
+        self._meta.source_to_key = {}
         default_prefix = ''
-        if name_spaces and self._name_space in name_spaces:
-            default_prefix = ''.join([name_spaces[self._name_space], ':'])
+        if name_spaces and self._meta.name_space in name_spaces:
+            default_prefix = ''.join([name_spaces[self._meta.name_space], ':'])
         for key, field in self._clsfields.items():
             source = field.get_source(key, name_spaces, default_prefix)
-            self._source_to_key[source] = key
-        self._key_to_source = {value: key for key, value in
-                               self._source_to_key.items()}
+            self._meta.source_to_key[source] = key
+        self._meta.key_to_source = {value: key for key, value in
+                               self._meta.source_to_key.items()}
 
     def _find_field(self, name):
-        if name in self._source_to_key:
-            key = self._source_to_key[name]
+        if name in self._meta.source_to_key:
+            key = self._meta.source_to_key[name]
             if key in self._fields:
                 return key
 
@@ -271,7 +317,6 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
 
     def populate(self, data, **kwargs):
         name_spaces = kwargs.get('name_spaces')
-        self._non_empty_fields = set([])
         self._gen_key_to_from_source(name_spaces)
         for name, value in data.items():
             key = self._find_field(name)
@@ -298,13 +343,13 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                 except ValidationException as e:
                     msg_rec = MessageRecord(path=self._path, field=key,
                                             msg=e.msg)
-                    self._errors.append(msg_rec)
+                    self._meta.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
         if self._extra and not \
-                (self._allow_extra_elements or self._allow_extra_attributes):
+                (self._meta.allow_extra_elements or self._meta.allow_extra_attributes):
             msg = 'Found extra fields: %s' % ','.join(self._extra.keys())
             msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
-            self._errors.append(msg_rec)
+            self._meta.errors.append(msg_rec)
             error(logger, msg_rec, **kwargs)
         return self
 
@@ -318,7 +363,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                 except ValidationException as e:
                     msg_rec = MessageRecord(path=self._path, field=key,
                                             msg=e.msg)
-                    self._errors.append(msg_rec)
+                    self._meta.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
         return self
 
@@ -332,7 +377,7 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
             if value is not None:
                 try:
                     kwargs['path'] = self._path
-                    serialized_key = self._key_to_source[key]
+                    serialized_key = self._meta.key_to_source[key]
                     serialized_data = field.serialize(value, **kwargs)
                     if serialized_data =={}:
                         result[serialized_key] = None
@@ -341,14 +386,16 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
                 except ValidationException as e:
                     msg_rec = MessageRecord(path=self._path, field=key,
                                             msg=e.msg)
-                    self._errors.append(msg_rec)
+                    self._meta.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
         result.update(self._extra)
         return result
 
     @property
     def _fields(self):
-        return dict(self._clsfields, **self._extra)
+        if self._extra:
+            return dict(self._clsfields, **self._extra)
+        return dict(self._clsfields)
 
     def _get_fields_items(self):
         return list(self._data.items())
@@ -378,36 +425,38 @@ class Model(with_metaclass(ModelType, CommonEqualityMixin)):
 class AttributeModel(Model):
     """Used to describe elements with attributes and no children.
     """
-    _value_key = 'value'
-    required_attributes = None
+    id = 'AttributeModel'
+
+    class Meta:
+        value_key = 'value'
+        required_attributes = None
+
+    # def _gen_key_to_from_source(self, name_spaces):
+    #     super(AttributeModel, self)._gen_key_to_from_source(name_spaces)
 
     def __init__(self):
         super(AttributeModel, self).__init__()
-        if self.required_attributes is None:
-            self.required_attributes = []
+        if self._meta.required_attributes is None:
+            self._meta.required_attributes = []
         cls_fields = {}
         for name, field in self._clsfields.items():
-            if name == self._value_key:
+            if name == self._meta.value_key:
                 cls_fields[name] = self._clsfields[name]
                 if not cls_fields[name].source:
                     cls_fields[name].source = '#text'
             else:
-                if name in self.required_attributes:
+                if name in self._meta.required_attributes:
                     cls_fields[name] = RequiredAttribute(field)
                 else:
                     cls_fields[name] = OptionalAttribute(field)
         self._clsfields = cls_fields
 
-    def __setattr__(self, key, value):
-        if key == 'required_attributes':
-            self.__dict__[key] = value
-        else:
-            return super(AttributeModel, self).__setattr__(key, value)
-
 
 class SequenceModel(Model):
-    _initial = None
-    _sequence = None
+
+    class Meta:
+        initial = None
+        sequence = None
 
     def __init__(self):
         super(SequenceModel, self).__init__()
@@ -415,10 +464,10 @@ class SequenceModel(Model):
 
     def validate(self, **kwargs):
         self._path = self._build_path(**kwargs)
-        if self._initial is not None:
+        if self._meta.initial is not None:
             if kwargs.get('stores') is None:
                 kwargs['stores'] = Stores()
-            self._initial.add_keys(path=self._path, stores=kwargs['stores'])
+            self._meta.initial.add_keys(path=self._path, stores=kwargs['stores'])
         super(SequenceModel, self).validate(**kwargs)
         element_tags = []
         for tag in self._non_empty_fields:
@@ -428,10 +477,17 @@ class SequenceModel(Model):
                     element_tags.append(tag)
         self._data_sequence = self.match_sequence(element_tags, **kwargs)
 
+    @classmethod
+    def from_dict(cls, raw_data, **kwargs):
+        instance = cls()
+        instance.populate(raw_data, **kwargs)
+        instance.validate(**kwargs)
+        return instance
+
     def match_sequence(self, value_tags, **kwargs):
         result_sequence = []
         path = kwargs.get('path', '')
-        for field in self._sequence:
+        for field in self._meta.sequence:
             if isinstance(field, SequenceElement):
                 if field.tag in value_tags:
                     result_sequence.append(field.tag)
@@ -439,7 +495,7 @@ class SequenceModel(Model):
                     msg = "Missing required key: %s %s" % (field.tag, path)
                     msg_rec = MessageRecord(path=self._path, field=field.tag,
                                             msg=msg)
-                    self._errors.append(msg_rec)
+                    self._meta.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
             elif isinstance(field, Choice):
                 choice_keys_sey = set(value_tags) & field.all_keys_set
@@ -450,7 +506,7 @@ class SequenceModel(Model):
         if extra_tags:
             msg = "Could not match tag(s): %s" % ', '.join(extra_tags)
             msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
-            self._errors.append(msg_rec)
+            self._meta.errors.append(msg_rec)
             error(logger, msg_rec, **kwargs)
         return result_sequence
 
