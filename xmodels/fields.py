@@ -677,7 +677,9 @@ class WrappedObjectField(BaseField):
 
     @property
     def name_space(self):
-        return getattr(self._wrapped_class, '_name_space', None)
+        meta = getattr(self._wrapped_class, '_meta', None)
+        if meta:
+            return getattr(meta, 'name_space', None)
 
 
 class ModelField(WrappedObjectField):
