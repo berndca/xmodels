@@ -59,6 +59,7 @@ class BaseField(CommonEqualityMixin):
         self.serial_format = kwargs.get('serial_format', self.serial_format)
         self._name_space = kwargs.get('name_space', self._name_space)
         self.isAttribute = False
+        self.required = kwargs.get('required', False)
 
     def __str__(self):
         return self.__class__.__name__
@@ -105,13 +106,12 @@ class BaseField(CommonEqualityMixin):
         return self._name_space
 
 
-class RequiredAttribute(BaseField):
-    """Describes a required XML attribute."""
-    required = True
+class AttributeField(BaseField):
+    """Describes a XML attribute."""
     field_instance = None
 
     def __init__(self, field_instance, **kwargs):
-        super(RequiredAttribute, self).__init__(**kwargs)
+        super(AttributeField, self).__init__(**kwargs)
         self.isAttribute = True
         self.default = field_instance.default
         self.source = field_instance.source
@@ -128,7 +128,7 @@ class RequiredAttribute(BaseField):
 
     def get_source(self, key, name_spaces=None, default_prefix=''):
         source_key = self.field_instance.source or key
-        source = super(RequiredAttribute, self).get_source(
+        source = super(AttributeField, self).get_source(
             source_key, name_spaces, default_prefix)
         if source[0] == '@':
             return source
@@ -136,7 +136,7 @@ class RequiredAttribute(BaseField):
 
     def validate(self, raw_data, **kwargs):
         if raw_data is None:
-            if self.required:
+            if self.field_instance.required:
                 raise ValidationException(self.messages['required'],
                                           self.__str__())
         else:
@@ -149,9 +149,12 @@ class RequiredAttribute(BaseField):
         return self.field_instance.serialize(py_data, **kwargs)
 
 
-class OptionalAttribute(RequiredAttribute):
-    """Describes an optional XML attribute."""
-    required = False
+class RequiredAttribute(AttributeField):
+    """Describes a required XML attribute."""
+
+    def __init__(self, field_instance, **kwargs):
+        super(RequiredAttribute, self).__init__(field_instance, **kwargs)
+        self.required = True
 
 
 class CharField(BaseField):

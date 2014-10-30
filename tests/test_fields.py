@@ -10,7 +10,7 @@ from xmodels.fields import IntegerField, BooleanField, \
     ValidationException, BaseField, CharField, RegexField, Token, Name, NCName, \
     Language, NMTOKEN, RangeField, FloatField, NonNegativeInteger, \
     PositiveInteger, NegativeInteger, EnumField, DateTimeField, DateField, \
-    TimeField, OptionalAttribute, RequiredAttribute
+    TimeField, AttributeField, RequiredAttribute
 from xmodels.iso8601 import Timezone
 
 
@@ -51,7 +51,7 @@ class TestBaseField():
 
     def test_ne(self):
         inst1 = RequiredAttribute(CharField())
-        inst2 = OptionalAttribute(CharField())
+        inst2 = AttributeField(CharField())
         assert inst1 != inst2
 
     def test_empty_fail(self):
@@ -62,14 +62,14 @@ class TestBaseField():
 
     def test_name_space_kwarg(self):
         name_space="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
-        id = OptionalAttribute(CharField(name_space=name_space))
+        id = AttributeField(CharField(name_space=name_space))
         assert id.name_space == name_space
 
 
 class TestAttribute():
     @classmethod
     def setup_class(cls):
-        cls.instance = OptionalAttribute(IntegerField())
+        cls.instance = AttributeField(IntegerField())
 
     def test_source_from_key(self):
         source = self.instance.get_source('key')
