@@ -1,7 +1,7 @@
 from .. import SequenceModel, CharField, AttributeModel, \
     ModelCollectionField, FloatField, DateTimeField, IntegerField
 from ..fields import Token, NonNegativeInteger, RequiredAttribute, \
-    OptionalAttribute
+    AttributeField
 from ..models import SequenceElement
 
 
@@ -35,7 +35,7 @@ class TestSuite(SequenceModel):
     system_out = CharField(source='system-out')
     error_out = CharField(source='error-out')
     name = RequiredAttribute(CharField())
-    timestamp = OptionalAttribute(DateTimeField(
+    timestamp = AttributeField(DateTimeField(
         required=True, serial_format="%Y-%m-%dT%H:%M:%S"))
     hostname = RequiredAttribute(Token())
     package = RequiredAttribute(Token())

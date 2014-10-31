@@ -1,7 +1,7 @@
 from xmodels import CharField, FieldCollectionField, IntegerField, ModelField, \
     FloatField, Model, DateTimeField, ModelCollectionField, AttributeModel
 from xmodels.constraints import ID
-from xmodels.fields import EnumField, RequiredAttribute, OptionalAttribute
+from xmodels.fields import EnumField, RequiredAttribute, AttributeField
 from xmodels.models import SequenceModel, SequenceElement, Choice
 
 __author__ = 'bernd'
@@ -40,7 +40,7 @@ class VLNVAttributes(AttributeModel):
 
 
 class LoadConstraint(AttributeModel):
-    id = OptionalAttribute(ID())
+    id = AttributeField(ID())
     value = CharField()
     count = IntegerField(min=0, default=3)
 
@@ -58,7 +58,7 @@ class Size(AttributeModel):
 class HierarchicalSequenceModel(SequenceModel):
 
     name = CharField()
-    id = OptionalAttribute(ID())
+    id = AttributeField(ID())
     busRef = ModelField(VLNVAttributes)
     count = IntegerField(min=0, default=0)
     child = ModelField(ChildModel)
@@ -158,7 +158,7 @@ class LogicalWirePowerDefs(SequenceModel):
 
 
 class AccelleraLogicalWire(SequenceModel):
-    id = OptionalAttribute(ID(name_space="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"))
+    id = AttributeField(ID(name_space="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"))
     logicalWirePowerDefs = ModelField(LogicalWirePowerDefs)
 
     class Meta:

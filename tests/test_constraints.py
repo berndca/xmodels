@@ -21,7 +21,7 @@ def test_init_unique_store_pass():
     ks = constraints.InitUniqueStore('TestUnique')
     path = 'root.test'
     ks.add_keys(path=path, stores=stores)
-    assert stores.keyStore.keys == {'TestUnique:root.test': {}}
+    assert stores.uniquesStore.keys == {'TestUnique:root.test': {}}
 
 
 def test_init_key_store_pass():
@@ -124,7 +124,7 @@ def test_setup_key_refs_store_value_empty_fail():
 
 
 def test_init_key_store_no_key_fail():
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         constraints.InitKeyStore('')
 
 
@@ -345,7 +345,7 @@ def test_match_refs_pass():
     constraints.match_refs(stores)
     targets = {'root.component.busInterfaces.busInterface[0].slave.'
                'memoryMapRef.memoryMapRef':
-                   'root.component.memoryMaps.memoryMap[0].name'}
+               'root.component.memoryMaps.memoryMap[0].name'}
     assert stores.refStore.targets == targets
 
 

@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 
 class ValidationException(Exception):
+    """
+    Serves as custom exception for all field validations.
+    """
     def __init__(self, msg, value):
         super(ValidationException, self).__init__(self, msg, repr(value))
         self._msg = msg
@@ -49,6 +52,16 @@ class BaseField(CommonEqualityMixin):
     source data. If ``source`` is not specified, the field instance will use
     its own name as the key to retrieve the value from the source data.
 
+    The ``serial_format`` parameter controls the serialization format, e.g. in
+    DateTimeField etc.
+
+    A default value can be assigned through the ``default`` parameter.
+
+    :param bool kwargs['required']: indicates required field
+    :param str kwargs['default']: default value, used when raw_data is None
+    :param str kwargs['serial_format']: format string for serialization and
+    deserialization
+    :param str kwargs['source']: field name for serialized version
     """
     serial_format = None
     _name_space = None
@@ -59,6 +72,7 @@ class BaseField(CommonEqualityMixin):
         self.serial_format = kwargs.get('serial_format', self.serial_format)
         self._name_space = kwargs.get('name_space', self._name_space)
         self.isAttribute = False
+        self.required = kwargs.get('required', False)
 
     def __str__(self):
         return self.__class__.__name__
@@ -84,11 +98,6 @@ class BaseField(CommonEqualityMixin):
 
         :param raw_data: raw data for field
         :type raw_data: str or other valid formats
-        :param bool kwargs['required']: indicates required field
-        :param str kwargs['default']: default value, used when raw_data is None
-        :param str kwargs['serial_format']: format string for serialization and
-        deserialization
-        :param str kwargs['source']: field name for serialized version
         :returns: validated_data
         :raises ValidationException: if self.required and raw_data is None
         """
@@ -105,13 +114,14 @@ class BaseField(CommonEqualityMixin):
         return self._name_space
 
 
-class RequiredAttribute(BaseField):
-    """Describes a required XML attribute."""
-    required = True
+class AttributeField(BaseField):
+    """Wrapper to describes a XML attribute. Adds prefix '@' to the result of
+    get_source if source does not already start with '@'. The '@' prefix
+    identifies attribute fields."""
     field_instance = None
 
     def __init__(self, field_instance, **kwargs):
-        super(RequiredAttribute, self).__init__(**kwargs)
+        super(AttributeField, self).__init__(**kwargs)
         self.isAttribute = True
         self.default = field_instance.default
         self.source = field_instance.source
@@ -128,7 +138,7 @@ class RequiredAttribute(BaseField):
 
     def get_source(self, key, name_spaces=None, default_prefix=''):
         source_key = self.field_instance.source or key
-        source = super(RequiredAttribute, self).get_source(
+        source = super(AttributeField, self).get_source(
             source_key, name_spaces, default_prefix)
         if source[0] == '@':
             return source
@@ -136,7 +146,7 @@ class RequiredAttribute(BaseField):
 
     def validate(self, raw_data, **kwargs):
         if raw_data is None:
-            if self.required:
+            if self.field_instance.required:
                 raise ValidationException(self.messages['required'],
                                           self.__str__())
         else:
@@ -149,9 +159,12 @@ class RequiredAttribute(BaseField):
         return self.field_instance.serialize(py_data, **kwargs)
 
 
-class OptionalAttribute(RequiredAttribute):
-    """Describes an optional XML attribute."""
-    required = False
+class RequiredAttribute(AttributeField):
+    """Wrapper to describe a required XML attribute."""
+
+    def __init__(self, field_instance, **kwargs):
+        super(RequiredAttribute, self).__init__(field_instance, **kwargs)
+        self.required = True
 
 
 class CharField(BaseField):
@@ -208,8 +221,9 @@ class CharField(BaseField):
 
 
 class RegexField(CharField):
-    """
-
+    """Field to represent unicode strings matching a regular expression.
+    It raises ValidationException if there is no match.
+    :param regex: regular expression to match.
     """
     regex = r''
     messages = dict(
@@ -229,7 +243,7 @@ class RegexField(CharField):
 
 
 class Token(CharField):
-    """
+    """CharField for xsd:token.
     Tokens are strings without leading and trailing whitespaces. All other
     whitespaces are collapsed.
     """
@@ -249,7 +263,7 @@ class Token(CharField):
 
 
 class Name(RegexField):
-    """
+    """Field for xsd:name.
     Values of this type must start with a letter, underscore (_), or colon (:),
     and may contain only letters, digits, underscores (_), colons (:), hyphens
     (-), and periods (.). Colons should only be used to separate namespace
@@ -284,7 +298,7 @@ underscore (_), dash (-), and dot (.) characters. Only one colon (:) total.""",
 
 
 class NCName(RegexField):
-    """
+    """Field for xsd:ncname.
     The type NCName represents an XML non-colonized name, which is simply a
     name that does not contain colons. An NCName must start with either a
     letter or underscore (_) and may contain only letters, digits, underscores
@@ -300,7 +314,7 @@ shall only contain letters, numbers, and the underscore (_), dash (-), and dot
 
 
 class Language(RegexField):
-    """
+    """Field for xsd:language.
     The type language represents a natural language identifier, generally used
     to indicate the language of a document or a part of a document. Before
     creating a new attribute of type language, consider using the xml:lang
@@ -332,7 +346,7 @@ letters separated by a dash (-)."""
 
 
 class NMTOKEN(RegexField):
-    """
+    """Field for xsd:NMTOKEN.
     The type NMTOKEN represents a single string token. NMTOKEN values may
     consist of letters, digits, periods (.), hyphens (-), underscores (_), and
     colons (:). They may start with any of these characters. NMTOKEN has a
@@ -346,6 +360,11 @@ class NMTOKEN(RegexField):
 
 
 class RangeField(BaseField):
+    """
+    Base class for IntegerField and FloatField.
+    :param int/float kwargs['min']: indicates minimum allow value (inclusive).
+    :param int/float kwargs['max']: indicates maximum allow value (inclusive).
+    """
     min = None
     max = None
     messages = dict(
@@ -372,7 +391,7 @@ class RangeField(BaseField):
 
 
 class IntegerField(RangeField):
-    """Field to represent an integer value"""
+    """Field to represent an integer value."""
     messages = dict(
         invalid="Could not convert to int:"
     )
@@ -393,14 +412,23 @@ class IntegerField(RangeField):
 
 
 class NonNegativeInteger(IntegerField):
+    """
+    Field to represent a non negative integer value.
+    """
     min = 0
 
 
 class PositiveInteger(IntegerField):
+    """
+    Field to represent a positive integer value.
+    """
     min = 1
 
 
 class NegativeInteger(IntegerField):
+    """
+    Field to represent a negative integer value.
+    """
     max = -1
 
 
@@ -444,6 +472,9 @@ class FloatField(RangeField):
 
 
 class NonNegativeFloat(FloatField):
+    """
+    Field to represent a non negative floating point value.
+    """
     min = 0
 
 
@@ -548,7 +579,7 @@ class DateTimeField(BaseField):
 
     The ``serial_format`` parameter is a strftime formatted string for
     serialization. If ``serial_format`` isn't specified, an ISO formatted
-    string will be returned by :meth:`~micromodels.DateTimeField.to_serial`.
+    string will be returned by :meth:`~xmodels.DateTimeField.to_serial`.
 
     """
     messages = dict(
@@ -699,12 +730,12 @@ class ModelField(WrappedObjectField):
     You could build the following classes
     (note that you have to define the inner nested models first)::
 
-        class MyNestedModel(micromodels.Model):
-            nested_item = micromodels.CharField()
+        class MyNestedModel(xmodels.Model):
+            nested_item = xmodels.CharField()
 
-        class MyMainModel(micromodels.Model):
-            first_item = micromodels.CharField()
-            second_item = micromodels.ModelField(MyNestedModel)
+        class MyMainModel(xmodels.Model):
+            first_item = xmodels.CharField()
+            second_item = xmodels.ModelField(MyNestedModel)
 
     Then you can access the data as follows::
 
@@ -743,11 +774,11 @@ class ModelCollectionField(WrappedObjectField):
             ]
         }
 
-        class MyNestedModel(micromodels.Model):
-            value = micromodels.CharField()
+        class MyNestedModel(xmodels.Model):
+            value = xmodels.CharField()
 
-        class MyMainModel(micromodels.Model):
-            list = micromodels.ModelCollectionField(MyNestedModel)
+        class MyMainModel(xmodels.Model):
+            list = xmodels.ModelCollectionField(MyNestedModel)
 
         >>> m = MyMainModel(some_data)
         >>> len(m.list)
@@ -814,6 +845,7 @@ class FieldCollectionField(BaseField):
         p = Person(data)
 
     And now a quick REPL session::
+    FIXME doctest
 
         >>> p.legal_name
         u'John Smith'
@@ -821,8 +853,6 @@ class FieldCollectionField(BaseField):
         [u'Larry', u'Mo', u'Curly']
         >>> p.to_dict()
         {'legal_name': u'John Smith', 'aliases': [u'Larry', u'Mo', u'Curly']}
-        >>> p.to_dict() == p.to_dict(serial=True)
-        True
 
     Here is a bit more complicated example involving args and kwargs::
 
@@ -840,10 +870,10 @@ class FieldCollectionField(BaseField):
         f = FaultLine(data)
 
     Notice that source is passed to to the
-    :class:`~micromodels.FieldCollectionField`, not the
-    :class:`~micromodels.DateField`.
+    :class:`~xmodels.FieldCollectionField`, not the
+    :class:`~xmodels.DateField`.
 
-    Let's check out the resulting :class:`~micromodels.Model` instance with the
+    Let's check out the resulting :class:`~xmodels.Model` instance with the
     REPL::
 
         >>> f.name
@@ -855,12 +885,6 @@ class FieldCollectionField(BaseField):
         {'earthquake_dates': [datetime.date(1906, 5, 11),
         datetime.date(1948, 11, 2), datetime.date(1970, 1, 1)],
          'name': u'San Andreas'}
-        >>> f.to_dict(serial=True)
-        {'earthquake_dates': ['05-11-1906', '11-02-1948', '01-01-1970'],
-        'name': u'San Andreas'}
-        >>> f.to_json()
-        '{"earthquake_dates": ["05-11-1906", "11-02-1948", "01-01-1970"],
-        "name": "San Andreas"}'
 
     """
     def __init__(self, field_instance, **kwargs):

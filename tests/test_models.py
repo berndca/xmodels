@@ -4,7 +4,7 @@ import datetime
 import pytest
 
 from xmodels.constraints import ID, InitStores
-from xmodels.fields import OptionalAttribute, DateTimeField, FloatField, Name, \
+from xmodels.fields import AttributeField, DateTimeField, FloatField, Name, \
     RequiredAttribute
 from tests.definitions import HierarchicalSequenceModel, Size, \
     VendorExtensions, name_spaces, Port, AbstractDefinition, LibraryRef
@@ -20,7 +20,7 @@ class TestElementNoAttributes(object):
         usually contains tests).
         """
         class Register(SequenceModel):
-            id = OptionalAttribute(ID())
+            id = AttributeField(ID())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
@@ -40,9 +40,6 @@ class TestElementNoAttributes(object):
         }
         cls.cls = Register
         cls.instance = Register.from_dict(cls.register_dict)
-
-    def test_pass(self):
-        assert self.instance._meta.errors == []
 
     def test_address_offset(self):
         assert self.instance.addressOffset == 0
@@ -78,7 +75,7 @@ class TestElementNoAttributes(object):
         self.cls.from_dict(reg_dict, errors=errors)
         assert errors == [MessageRecord(
             path='Register', field='_extra',
-            msg='Found extra fields: extra_element')]
+            msg='Found extra element fields: extra_element')]
 
 
 class TestElementWithAttributes(object):
@@ -88,7 +85,7 @@ class TestElementWithAttributes(object):
         usually contains tests).
         """
         class Register(Model):
-            id = OptionalAttribute(ID())
+            id = AttributeField(ID())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
@@ -117,7 +114,7 @@ class TestElementWithAttributes(object):
 
     def test_str(self):
         assert str(self.instance) == "Register(Model): 'addressOffset': IntegerField, " \
-                                     "'id': OptionalAttribute, " \
+                                     "'id': AttributeField, " \
                                      "'name': CharField, " \
                                      "'size': ModelField: Size"
         assert str(self.instance) == repr(self.instance)
@@ -149,14 +146,14 @@ class TestModelExtra(object):
     @classmethod
     def setup_class(cls):
         class Extras(Model):
-            id = OptionalAttribute(CharField())
+            id = AttributeField(CharField())
             name = CharField()
             addressOffset = IntegerField()
             size = ModelField(Size)
 
             class Meta:
-                allow_extra_elements = True
-                allow_extra_attributes = True
+                allow_extra_element_fields = True
+                allow_extra_attribute_fields = True
 
         cls.cls = Extras
         cls.instance = Extras()
@@ -198,7 +195,7 @@ def test_sequence_element_max_occurs():
 
 
 def test_sequence_element_max_assert_fail():
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         SequenceElement('component', min_occurs=12, max_occurs=2)
 
 
@@ -485,7 +482,7 @@ class TestSequenceModels():
             key_names = ['systemGroupNameKey']
 
         class Sequence0(SequenceModel):
-            id = OptionalAttribute(ID())
+            id = AttributeField(ID())
             name = Name()
             size = IntegerField(min=1)
 

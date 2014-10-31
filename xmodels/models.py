@@ -1,11 +1,9 @@
-from collections import OrderedDict
 import logging
-
 from six import with_metaclass
-from .fields import BaseField, WrappedObjectField, ValidationException, \
-    OptionalAttribute, RequiredAttribute
-from .constraints import Stores
 
+from .fields import BaseField, WrappedObjectField, ValidationException, \
+    RequiredAttribute, AttributeField
+from .constraints import Stores
 from .utils import CommonEqualityMixin, MessageRecord
 
 
@@ -16,62 +14,12 @@ def error(logger_inst, message, **kwargs):
     kwargs['errors'].append(message)
     logger_inst.error(message)
 
-from django.db.models import base
-
-
-class Options(object):
-    def __init__(self, meta):
-        self.errors = None
-        self.key_to_source = None
-        self.source_to_key = None
-        self.allow_extra_elements = False
-        self.allow_extra_attributes = False
-        if meta:
-            for key, value in meta.__dict__.items():
-                self.__dict__[key] = value
-
-
-class ModelType(type):
-    """Creates the metaclass for Model. The main function of this metaclass
-    is to move all of fields into the _fields variable on the class.
-
-    """
-
-    def __new__(cls, name, bases, attrs):
-        super_new = super(ModelType, cls).__new__
-
-        if not any(b for b in bases if isinstance(b, ModelType)):
-            return super_new(cls, name, bases, attrs)
-
-        module = attrs.pop('__module__')
-        new_class = super_new(cls, name, bases, {'__module__': module})
-        new_class._clsfields = {}
-        new_class._extra = None
-        new_class._data = None
-        new_class._non_empty_fields = None
-        new_class._defaults = {}
-        for key, value in attrs.items():
-            if isinstance(value, BaseField):
-                new_class._clsfields[key] = value
-        for key in new_class._clsfields.keys():
-            attrs.pop(key, None)
-        for key, field in new_class._clsfields.items():
-            if field.default is not None:
-                new_class._defaults[key] = field.default
-        base_meta = getattr(new_class, 'Meta', {})
-        attr_meta = attrs.pop('Meta', None)
-        if attr_meta:
-            for key, value in attr_meta.__dict__.items():
-                setattr(base_meta, key, value)
-        new_class._meta = Options(base_meta)
-        # Add all attributes to the class.
-        for obj_name, obj in attrs.items():
-            setattr(new_class, obj_name, obj)
-        return new_class
-
 
 class SequenceElement(CommonEqualityMixin):
-
+    """
+    Container to store xml tag, min_occurs and max_occurs. The property
+    required is True when min_occurs > 0.
+    """
     def __repr__(self):
         return '%s: %s (%d, %d)' % (self.__class__.__name__, self.tag,
                                     self.min_occurs, self.max_occurs)
@@ -80,8 +28,8 @@ class SequenceElement(CommonEqualityMixin):
         self.tag = tag
         self._min_occurs = min_occurs
         self._max_occurs = max_occurs
-        if max_occurs > 0:
-            assert min_occurs <= max_occurs
+        if 0 < max_occurs < min_occurs:
+            raise ValueError
 
     @property
     def min_occurs(self):
@@ -98,11 +46,16 @@ class SequenceElement(CommonEqualityMixin):
 
 class Choice(CommonEqualityMixin):
     """
-
+    The Choice class describes the options of the xsd:choice element.
+    The options attributes is a list of choices. Each option may either
+    be a single SequenceElement or a list of SequenceElement (xsd:sequence).
+    If required is True, the default, the set of value keys (value_key_set)
+    in self.match_choice_keys must match at least one set of required keys
+    listed in any option. If required is False, the set of value keys may
+    be empty.
     """
 
     def __init__(self, options, required=True, **kwargs):
-        super(Choice, self).__init__(**kwargs)
         assert isinstance(options, list)
         self.options = [option for option in options]
         self.required = required
@@ -180,65 +133,88 @@ class Choice(CommonEqualityMixin):
                 if tag in self._flat_options]
 
 
-class Model(with_metaclass(ModelType)):
-    """The Model is the main component of micromodels. Model makes it trivial
-    to parse data from many sources, including JSON APIs.
-
-    You will probably want to initialize this class using the class methods
-    :meth:`from_dict` or :meth:`from_kwargs`. If you want to initialize an
-    instance without any data, just call :class:`Model` with no parameters.
-
-    :class:`Model` instances have a unique behavior when an attribute is set
-    on them. This is needed to properly format data as the fields specify.
-    The variable name is referred to as the key, and the value will be called
-    the value. For example, in::
-
-        instance = Model()
-        instance.age = 18
-
-    ``age`` is the key and ``18`` is the value.
-
-    First, the model checks if it has a field with a name matching the key.
-
-    If there is a matching field, then :meth:`validate` is called on the field
-    with the value.
-        If :meth:`validate` does not raise an exception, then the result of
-        :meth:`validate` is set on the instance, and the method is completed.
-        Essentially, this means that the first thing setting an attribute tries
-        to do is process the data as if it was a "primitive" data type.
-
-        If :meth:`validate` does raise an exception, this means that the data
-        might already be an appropriate Python type. The :class:`Model` then
-        attempts to *serialize* the data into a "primitive" type using the
-        field's :meth:`to_serial` method.
-
-            If this fails, a ``TypeError`` is raised.
-
-            If it does not fail, the value is set on the instance, and the
-            method is complete.
-
-    If the instance doesn't have a field matching the key, then the key and
-    value are just set on the instance like any other assignment in Python.
-
+class Options(object):
     """
-    id = 'Model'
+    Container for meta properties.
+    """
+    def __init__(self, meta):
+        self.key_to_source = None
+        self.source_to_key = None
+        self.allow_extra_element_fields = False
+        self.allow_extra_attribute_fields = False
+        if meta:
+            for key, value in meta.__dict__.items():
+                self.__dict__[key] = value
 
+
+class ModelType(type):
+    """Creates the metaclass for Model. The main function of this metaclass
+    is to move all of fields into the _clsfields variable on the class and to
+    combine/update the class variables of the inner class Meta into an Options
+    instance which is stored under _meta.
+    """
+
+    def __new__(cls, name, bases, attrs):
+        super_new = super(ModelType, cls).__new__
+
+        if not any(b for b in bases if isinstance(b, ModelType)):
+            return super_new(cls, name, bases, attrs)
+
+        module = attrs.pop('__module__')
+        new_class = super_new(cls, name, bases, {'__module__': module})
+        new_class._clsfields = {}
+        new_class._extra = None
+        new_class._data = None
+        new_class._non_empty_fields = None
+        new_class._defaults = {}
+        for key, value in attrs.items():
+            if isinstance(value, BaseField):
+                new_class._clsfields[key] = value
+        for key in new_class._clsfields.keys():
+            attrs.pop(key, None)
+        for key, field in new_class._clsfields.items():
+            if field.default is not None:
+                new_class._defaults[key] = field.default
+        base_meta = getattr(new_class, 'Meta', {})
+        attr_meta = attrs.pop('Meta', None)
+        if attr_meta:
+            for key, value in attr_meta.__dict__.items():
+                setattr(base_meta, key, value)
+        new_class._meta = Options(base_meta)
+        # Add all attributes to the class.
+        for obj_name, obj in attrs.items():
+            setattr(new_class, obj_name, obj)
+        return new_class
+
+
+class Model(with_metaclass(ModelType)):
+    """The Model is the main component of xmodels.model. It is the base class
+    for AttributeModel and SequenceModel implementing common logic.
+
+    Usually one defines a number of fields as class variables. Fields may have
+    default values. All fields can be assigned and read. A read to a field which
+    has not been set previously return the default value if one exists or None. The
+    validate method validates all fields defined as class variables.
+
+    Instance variables may be created in addition to the fields specified as class
+     variables if Meta.allow_extra_element_fields is True. Otherwise the model
+     validation fails. The validation results are stored in a logger instance.
+    """
     class Meta:
-        allow_extra_elements = False
-        allow_extra_attributes = False
+        allow_extra_element_fields = False
+        allow_extra_attribute_fields = False
 
 
     def __init__(self):
         self._extra = {}
         self._data = {}
-        self._meta.errors = []
         self._path = ''
         self._non_empty_fields = set([])
 
-    def __str__(self):
-        return '%s(%s): %s' % (self.__class__.__name__, self.__class__.__base__.__name__,
-                           ', '.join(["'%s': %s" % (k, v) for k, v in
-                                      sorted(self._fields.items())]))
+    def __str__(self): return '%s(%s): %s' % (self.__class__.__name__,
+                                              self.__class__.__base__.__name__,
+                                              ', '.join(["'%s': %s" % (k, v)
+                                                         for k, v in sorted(self._fields.items())]))
 
     def __repr__(self):
         return self.__str__()
@@ -252,17 +228,15 @@ class Model(with_metaclass(ModelType)):
         return data
 
     def __setattr__(self, key, value):
-        # if key == '_meta':
-        #     setattr(self._meta, key, value)
         if key in self._clsfields.keys():
             self._data[key] = value
             if value is not None:
                 self._non_empty_fields.add(key)
         elif key.startswith('_'):
             self.__dict__[key] = value
-        elif key[0] == '@' and self._meta.allow_extra_attributes:
+        elif key[0] == '@' and self._meta.allow_extra_attribute_fields:
             self._extra[key] = value
-        elif key[0] != '@' and self._meta.allow_extra_elements:
+        elif key[0] != '@' and self._meta.allow_extra_element_fields:
             self._extra[key] = value
         else:
             raise AttributeError
@@ -270,21 +244,12 @@ class Model(with_metaclass(ModelType)):
     @classmethod
     def from_dict(cls, raw_data, **kwargs):
         """
-        This factory for :class:`Model`
-        takes either a native Python dictionary or a JSON dictionary/object
-        if ``is_json`` is ``True``. The dictionary passed does not need to
-        contain all of the values that the Model declares.
-
+        This factory for :class:`Model` creates a Model from a dict object.
         """
         instance = cls()
-        # cls._extract_name_spaces(kwargs, raw_data)
         instance.populate(raw_data, **kwargs)
         instance.validate(**kwargs)
         return instance
-
-    def basic_from_dict(self, raw_data, **kwargs):
-        self.populate(raw_data, **kwargs)
-        self.validate(**kwargs)
 
     def _gen_key_to_from_source(self, name_spaces):
         self._meta.source_to_key = {}
@@ -343,14 +308,18 @@ class Model(with_metaclass(ModelType)):
                 except ValidationException as e:
                     msg_rec = MessageRecord(path=self._path, field=key,
                                             msg=e.msg)
-                    self._meta.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
-        if self._extra and not \
-                (self._meta.allow_extra_elements or self._meta.allow_extra_attributes):
-            msg = 'Found extra fields: %s' % ','.join(self._extra.keys())
-            msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
-            self._meta.errors.append(msg_rec)
-            error(logger, msg_rec, **kwargs)
+        if self._extra:
+            extra_attributes = [key for key in self._extra.keys() if key.startswith('@')]
+            extra_elements = [key for key in self._extra.keys() if key not in extra_attributes]
+            if extra_attributes and not self._meta.allow_extra_attribute_fields:
+                msg = 'Found extra attribute fields: %s' % ','.join(extra_attributes)
+                msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
+                error(logger, msg_rec, **kwargs)
+            if extra_elements and not self._meta.allow_extra_element_fields:
+                msg = 'Found extra element fields: %s' % ','.join(extra_elements)
+                msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
+                error(logger, msg_rec, **kwargs)
         return self
 
     def deserialize(self, **kwargs):
@@ -363,7 +332,6 @@ class Model(with_metaclass(ModelType)):
                 except ValidationException as e:
                     msg_rec = MessageRecord(path=self._path, field=key,
                                             msg=e.msg)
-                    self._meta.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
         return self
 
@@ -386,7 +354,6 @@ class Model(with_metaclass(ModelType)):
                 except ValidationException as e:
                     msg_rec = MessageRecord(path=self._path, field=key,
                                             msg=e.msg)
-                    self._meta.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
         result.update(self._extra)
         return result
@@ -400,39 +367,15 @@ class Model(with_metaclass(ModelType)):
     def _get_fields_items(self):
         return list(self._data.items())
 
-    # def to_dict(self, name_spaces=None, dict_constructor=dict, **kwargs):
-    #     self.validate(**kwargs)
-    #     result = dict_constructor()
-    #     self._gen_key_to_from_source(name_spaces)
-    #     for key, value in self._get_fields_items():
-    #         if value is not None and key in self._key_to_source:
-    #             name = self._key_to_source[key]
-    #             if isinstance(value, Model):
-    #                 result[name] = value.to_dict(name_spaces=name_spaces)
-    #             elif (isinstance(value, list) and value and
-    #                   isinstance(value[0], Model)):
-    #                 result[name] = [item.to_dict(name_spaces=name_spaces)
-    #                                 for item in value if value is not None]
-    #             else:
-    #                 result[name] = value
-    #     if self._extra:
-    #         for name, value in self._extra.items():
-    #             if value is not None:
-    #                 result[name] = value
-    #     return result
-
 
 class AttributeModel(Model):
-    """Used to describe elements with attributes and no children.
+    """Used to describe elements with attributes, an optional
+    text value and no children. The key value  used
+    for the xml text #text is controlled by Meta.value_key.
     """
-    id = 'AttributeModel'
-
     class Meta:
         value_key = 'value'
         required_attributes = None
-
-    # def _gen_key_to_from_source(self, name_spaces):
-    #     super(AttributeModel, self)._gen_key_to_from_source(name_spaces)
 
     def __init__(self):
         super(AttributeModel, self).__init__()
@@ -448,12 +391,20 @@ class AttributeModel(Model):
                 if name in self._meta.required_attributes:
                     cls_fields[name] = RequiredAttribute(field)
                 else:
-                    cls_fields[name] = OptionalAttribute(field)
+                    cls_fields[name] = AttributeField(field)
         self._clsfields = cls_fields
 
 
 class SequenceModel(Model):
+    """
+    The SequenceModel is used to describe xml elements using xsd:sequence.
+    The sequence is described with a list of SequenceElement in Meta.sequence.
+    The validation method checks if all required attributes and min_occurs > 0
+    elements are not None.
 
+    The initial class variable is used for context initialization for identity
+    constraints checking.
+    """
     class Meta:
         initial = None
         sequence = None
@@ -477,13 +428,6 @@ class SequenceModel(Model):
                     element_tags.append(tag)
         self._data_sequence = self.match_sequence(element_tags, **kwargs)
 
-    @classmethod
-    def from_dict(cls, raw_data, **kwargs):
-        instance = cls()
-        instance.populate(raw_data, **kwargs)
-        instance.validate(**kwargs)
-        return instance
-
     def match_sequence(self, value_tags, **kwargs):
         result_sequence = []
         path = kwargs.get('path', '')
@@ -495,7 +439,6 @@ class SequenceModel(Model):
                     msg = "Missing required key: %s %s" % (field.tag, path)
                     msg_rec = MessageRecord(path=self._path, field=field.tag,
                                             msg=msg)
-                    self._meta.errors.append(msg_rec)
                     error(logger, msg_rec, **kwargs)
             elif isinstance(field, Choice):
                 choice_keys_sey = set(value_tags) & field.all_keys_set
@@ -506,7 +449,6 @@ class SequenceModel(Model):
         if extra_tags:
             msg = "Could not match tag(s): %s" % ', '.join(extra_tags)
             msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
-            self._meta.errors.append(msg_rec)
             error(logger, msg_rec, **kwargs)
         return result_sequence
 
@@ -515,10 +457,6 @@ class SequenceModel(Model):
         attributes = [(key, self._data[key]) for key in attribute_keys]
         elements = [(key, self._data[key]) for key in self._data_sequence]
         return attributes + elements
-
-    # def to_dict(self, name_spaces=None, dict_constructor=OrderedDict, **kwargs):
-    #     return super(SequenceModel, self).to_dict(
-    #         name_spaces, dict_constructor, **kwargs)
 
     def from_xml(self, raw_data, **kwargs):
         name_spaces = kwargs.get('name_spaces', {})
@@ -538,3 +476,7 @@ class SequenceModel(Model):
         kwargs['errors'] = []
         kwargs['name_spaces'] = name_spaces
         return self.populate(root_data, **kwargs)
+
+    def serialize(self, **kwargs):
+        # FIXME generate sequence
+        return super(SequenceModel, self).serialize(**kwargs)
