@@ -13,9 +13,14 @@ KeyRef = namedtuple('KeyRef', 'key_name key_value ref_path')
 
 
 class KeyStore(object):
+    """
+    Base class for all key and unique stores. It contains two dictionaries:
+    * index: {key_name: list_of_target_paths}
+    * keys: {'%s:%s % (key_name, target_path): {key_value: key_path}}
+    """
     def __init__(self):
-        self._key_index = {}
-        self._keys = {}
+        self.index = {}
+        self.keys = {}
 
     def add_key(self, key_names, target_path):
         if isinstance(key_names, list):
@@ -24,17 +29,17 @@ class KeyStore(object):
             key_names_list = [key_names]
         for key_name in key_names_list:
             key = '%s:%s' % (key_name, target_path)
-            if key in self._keys:
+            if key in self.keys:
                 raise ValidationException('Key %s does already exist.' % key,
                                           target_path)
-            if key_name not in self._key_index:
-                self._key_index[key_name] = [target_path]
+            if key_name not in self.index:
+                self.index[key_name] = [target_path]
             else:
-                self._key_index[key_name].append(target_path)
-            self._keys[key] = {}
+                self.index[key_name].append(target_path)
+            self.keys[key] = {}
 
     def in_keys(self, key_name, target_path):
-        return '%s:%s' % (key_name, target_path) in self._keys
+        return '%s:%s' % (key_name, target_path) in self.keys
 
     def add_value(self, key_names, target_path, key_value, key_path):
         if isinstance(key_names, string_types):
@@ -44,24 +49,24 @@ class KeyStore(object):
         for key_name in key_names_list:
             key = '%s:%s' % (key_name, target_path)
             if self.in_keys(key_name, target_path):
-                if key_value in self._keys[key]:
+                if key_value in self.keys[key]:
                     msg = 'Duplicate key value %s for %s at %s' % (key_value,
                                                                    key_name,
                                                                    key_path)
                     raise ValidationException(msg, key_value)
-                self._keys[key][key_value] = key_path
+                self.keys[key][key_value] = key_path
                 return True
         msg = 'Could not find target path %s for key name(s) %s' % \
               (target_path, ', '.join(key_names_list))
         raise ValidationException(msg, key_value)
 
     def match_ref(self, key_name, ref_key_value):
-        if key_name not in self._key_index:
+        if key_name not in self.index:
             raise ValidationException('No key for %s exists' % key_name,
                                       key_name)
-        for key_path in self._key_index[key_name]:
+        for key_path in self.index[key_name]:
             key = '%s:%s' % (key_name, key_path)
-            for key_value, instance_path in self._keys[key].items():
+            for key_value, instance_path in self.keys[key].items():
                 if key_value == ref_key_value:
                     return instance_path
         raise ValidationException('Could not match ref %s for %s' % (
@@ -69,16 +74,16 @@ class KeyStore(object):
 
     def key_value_count(self, key_name, target_path):
         key = '%s:%s' % (key_name, target_path)
-        if key in self._keys:
-            return len(self._keys[key])
+        if key in self.keys:
+            return len(self.keys[key])
         return 0
-
-    @property
-    def keys(self):
-        return {key: value for key, value in self._keys.items()}
 
 
 class IDStore(KeyStore):
+    """
+    ID's are a special case of key since all of them share the same path '/'
+    and of course they all share the same name 'ID'.
+    """
     key_name = 'ID'
     path = '/'
 
@@ -98,38 +103,40 @@ class IDStore(KeyStore):
 
 
 class RefStore(object):
+    """
+    Store for keyref identity constraints.
+    * refs: list of namedtuple KeyRef(key_name, key_value, ref_path)
+    * targets: dict {ref_path: target_path}
+    """
     def __init__(self):
-        self._refs = []
-        self._targets = {}
+        self.refs = []
+        self.targets = {}
 
     def add_key_ref(self, key_name, key_value, ref_path):
         if not key_value:
             raise ValidationException('key value is required', key_value)
-        self._refs.append(KeyRef(key_name, key_value, ref_path))
+        self.refs.append(KeyRef(key_name, key_value, ref_path))
 
     def set_target(self, ref_path, target_path):
-        if ref_path in self._targets:
+        if ref_path in self.targets:
             raise ValidationException('Target for ref_path already exists.',
                                       ref_path)
-        self._targets[ref_path] = target_path
-
-    @property
-    def refs(self):
-        return [ref for ref in self._refs]
-
-    @property
-    def targets(self):
-        return {ref: target for ref, target in self._targets.items()}
+        self.targets[ref_path] = target_path
 
 
 class IDREFStore(RefStore):
-    key_name = 'IDREF'
+    """
+    Store for IDREF. All IDREF refer to the same key: 'ID'.
+    """
 
     def add_idref(self, key_value, ref_path):
         super(IDREFStore, self).add_key_ref('ID', key_value, ref_path)
 
 
 class Stores(object):
+    """
+    Combination of all identity constraint related stores in a single object.
+    """
     def __init__(self):
         self.keyStore = KeyStore()
         self.uniquesStore = KeyStore()
@@ -154,8 +161,8 @@ def get_value_path_stores(**kwargs):
 
 class InitStores(object):
     """
-    Creates an empty dict under
-    stores.keyStore[keyName:keyTargetInstancePath]
+    Initializes stores.keyStore uf key_names or stores.uniquesStore
+    if unique_names by adding keys/path.
     """
     key_names = None
     unique_names = None
@@ -165,14 +172,15 @@ class InitStores(object):
         store='Parameter store of type Stores expected.',
     )
 
-    def __init__(self, **kwargs):
-        super(InitStores, self).__init__()
-
-    def add_keys(self, path='', stores=None, **kwargs):
+    def add_keys(self, path='', stores=None):
         if self.key_names:
             stores.keyStore.add_key(self.key_names, path)
         if self.unique_names:
             stores.uniquesStore.add_key(self.unique_names, path)
+
+    def check_key_name(self, key_name):
+        if not key_name or not isinstance(key_name, string_types):
+            raise ValueError(self.messages['name'])
 
 
 class InitKeyStore(InitStores):
@@ -185,20 +193,22 @@ class InitKeyStore(InitStores):
         store='Parameter store of type Stores expected.',
     )
 
-    def __init__(self, key_name, **kwargs):
-        super(InitKeyStore, self).__init__(**kwargs)
-        assert key_name and isinstance(key_name, string_types), \
-            self.messages['name']
+    def __init__(self, key_name):
+        self.check_key_name(key_name)
         self.key_names = [key_name]
 
 
-class InitUniqueStore(InitKeyStore):
-    def __init__(self, key_name, **kwargs):
-        super(InitUniqueStore, self).__init__(key_name, **kwargs)
+class InitUniqueStore(InitStores):
+    """
+    Creates an empty dict under
+    stores.uniquesStore[keyName:keyTargetInstancePath]
+    """
+    def __init__(self, key_name):
+        self.check_key_name(key_name)
         self.unique_names = [key_name]
 
 
-class AddKeyRef(RegexField):
+class SetupKeyRefsStore(object):
     """
     """
     string_validator_instance = None
@@ -208,12 +218,10 @@ class AddKeyRef(RegexField):
         emptyValue='Value may not be empty.',
     )
 
-    def __init__(self, **kwargs):
-        super(AddKeyRef, self).__init__(**kwargs)
+    def __init__(self, refer_key_name, **kwargs):
         self.string_validator_instance = kwargs.get(
             'string_validator_instance', self.string_validator_instance)
-        self.refer_key_name = kwargs.get(
-            'refer_key_name', self.refer_key_name)
+        self.refer_key_name = refer_key_name
 
     def validate(self, key_value, **kwargs):
         path, stores = get_value_path_stores(**kwargs)
@@ -227,22 +235,7 @@ class AddKeyRef(RegexField):
         return string_value
 
 
-class SetupKeyRefsStore(AddKeyRef):
-    """
-    """
-    string_validator = None
-    refer_key_name = None
-    messages = dict(
-        names='%(keyNames (type list of strings or string) is is required.',
-        emptyValue='Value may not be empty.',
-    )
-
-    def __init__(self, refer_key_name, **kwargs):
-        super(SetupKeyRefsStore, self).__init__(**kwargs)
-        self.refer_key_name = refer_key_name
-
-
-class CheckKeys(RegexField):
+class CheckKeys(object):
     """
     Determines the targetPath by removing <level>s from path.
 
@@ -269,7 +262,6 @@ class CheckKeys(RegexField):
     )
 
     def __init__(self, **kwargs):
-        super(CheckKeys, self).__init__(**kwargs)
         self.key_names = kwargs.get('key_names', self.key_names)
         self.level = kwargs.get('level', self.level)
         assert self.key_names, self.messages['names']
