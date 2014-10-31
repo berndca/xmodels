@@ -177,12 +177,12 @@ class ModelType(type):
                 new_class._defaults[key] = field.default
         base_meta = getattr(new_class, 'Meta')
         attr_meta = attrs.pop('Meta', None)
-        meta = {key: value for key, value in base_meta.__dict__.items()}
+        options = Options(base_meta.__dict__)
         if attr_meta:
             for key, value in attr_meta.__dict__.items():
-                meta[key] = value
-                # setattr(base_meta, key, value)
-        new_class._meta = Options(meta)
+                if not key.startswith('__'):
+                    setattr(options, key, value)
+        new_class._meta = options
         # Add all attributes to the class.
         for obj_name, obj in attrs.items():
             setattr(new_class, obj_name, obj)
@@ -205,6 +205,10 @@ class Model(with_metaclass(ModelType)):
     class Meta:
         allow_extra_element_fields = False
         allow_extra_attribute_fields = False
+        value_key = 'value'
+        required_attributes = None
+        initial = None
+        sequence = None
 
 
     def __init__(self):
