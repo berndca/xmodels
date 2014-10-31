@@ -1,30 +1,54 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 from setuptools.command.test import test as TestCommand
 import os
+import sys
+import io
 import re
 
 rel_file = lambda *args: os.path.join(os.path.dirname(os.path.abspath(__file__)), *args)
 
-readme = open('README.rst').read()
-history = open('HISTORY.rst').read().replace('.. :changelog:', '')
+
+def read(*filenames, **kwargs):
+    encoding = kwargs.get('encoding', 'utf-8')
+    sep = kwargs.get('sep', '\n')
+    buf = []
+    for filename in filenames:
+        with io.open(filename, encoding=encoding) as f:
+            buf.append(f.read())
+    return sep.join(buf)
 
 
 def get_version():
-    data = open(rel_file('xmodels', '__init__.py')).read()
+    data = read(rel_file('xmodels', '__init__.py'))
     return re.search(r"__version__ = '([^']+)'", data).group(1)
 
+readme = read('README.rst')
+history = read('HISTORY.rst').replace('.. :changelog:', '')
+
+
+class PyTest(TestCommand):
+    def finalize_options(self):
+        TestCommand.finalize_options(self)
+        self.test_args = []
+        self.test_suite = True
+
+    def run_tests(self):
+        import pytest
+        errcode = pytest.main(self.test_args)
+        sys.exit(errcode)
+
 requirements = [
-    # TODO: put package requirements here
+    'six'
 ]
 
 test_requirements = [
-    # TODO: put package test requirements here
+    'pytest'
 ]
 
 setup(
     name='xmodels',
     version=get_version(),
-    description='Python xmodels contains all the xmodels you need to create a Python package.',
+    description='Python models for creation, parsing and validation of XML documents.',
     long_description=readme + '\n\n' + history,
     author='Bernd Meyer',
     author_email='berndca@gmail.com',

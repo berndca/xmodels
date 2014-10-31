@@ -179,15 +179,15 @@ class CharField(BaseField):
         >>> CharField().validate(42)
         Traceback (most recent call last):
         ...
-        xmodels.fields.ValidationException: ValidationException: Expecting a string, value:42
+        ValidationException: ValidationException: Expecting a string, value:42
         >>> CharField(minLength=8).validate('0123')
         Traceback (most recent call last):
         ...
-        xmodels.fields.ValidationException: ValidationException: Expecting string longer than 8 characters, value:'0123'
+        ValidationException: ValidationException: Expecting string longer than 8 characters, value:'0123'
         >>> CharField(maxLength=8).validate('0123456789')
         Traceback (most recent call last):
         ...
-        xmodels.fields.ValidationException: ValidationException: Expecting string shorter than 8 characters, value:'0123456789'
+        ValidationException: ValidationException: Expecting string shorter than 8 characters, value:'0123456789'
     """
     strip = True
     minLength = None
@@ -278,7 +278,7 @@ class Name(RegexField):
         >>> name_field.validate('illegal!')
         Traceback (most recent call last):
         ...
-        xmodels.fields.ValidationException: ValidationException: A name needs to begin with a letter, colon (:), or
+        ValidationException: ValidationException: A name needs to begin with a letter, colon (:), or
         underscore (_) and shall only contain letters, numbers, and the colon (:),
         underscore (_), dash (-), and dot (.) characters. Only one colon (:) total., value:'illegal!'
     """
@@ -739,13 +739,6 @@ class ModelField(WrappedObjectField):
 
     Then you can access the data as follows::
 
-        >>> m = MyMainModel(some_data)
-        >>> m.first_item
-        u'Some value'
-        >>> m.second_item.__class__.__name__
-        'MyNestedModel'
-        >>> m.second_item.nested_item
-        u'Some nested value'
 
     """
 
@@ -780,15 +773,6 @@ class ModelCollectionField(WrappedObjectField):
         class MyMainModel(xmodels.Model):
             list = xmodels.ModelCollectionField(MyNestedModel)
 
-        >>> m = MyMainModel(some_data)
-        >>> len(m.list)
-        3
-        >>> m.list[0].__class__.__name__
-        'MyNestedModel'
-        >>> m.list[0].value
-        u'First value'
-        >>> [item.value for item in m.list]
-        [u'First value', u'Second value', u'Third value']
 
     """
 
@@ -847,12 +831,6 @@ class FieldCollectionField(BaseField):
     And now a quick REPL session::
     FIXME doctest
 
-        >>> p.legal_name
-        u'John Smith'
-        >>> p.aliases
-        [u'Larry', u'Mo', u'Curly']
-        >>> p.to_dict()
-        {'legal_name': u'John Smith', 'aliases': [u'Larry', u'Mo', u'Curly']}
 
     Here is a bit more complicated example involving args and kwargs::
 
@@ -876,15 +854,6 @@ class FieldCollectionField(BaseField):
     Let's check out the resulting :class:`~xmodels.Model` instance with the
     REPL::
 
-        >>> f.name
-        u'San Andreas'
-        >>> f.earthquake_dates
-        [datetime.date(1906, 5, 11), datetime.date(1948, 11, 2),
-        datetime.date(1970, 1, 1)]
-        >>> f.to_dict()
-        {'earthquake_dates': [datetime.date(1906, 5, 11),
-        datetime.date(1948, 11, 2), datetime.date(1970, 1, 1)],
-         'name': u'San Andreas'}
 
     """
     def __init__(self, field_instance, **kwargs):
