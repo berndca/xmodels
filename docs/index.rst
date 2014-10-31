@@ -34,6 +34,16 @@ Contents:
 
 .. toctree::
    :maxdepth: 2
+Contents:
+
+.. toctree::
+   :maxdepth: 2
+
+   readme
+   installation
+   contributing
+   authors
+   history
 
    api/fields
    api/models
