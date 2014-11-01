@@ -10,7 +10,7 @@ __author__ = 'bernd'
 def test_init_key_store_add_duplicate_key_name_fail():
     stores = constraints.Stores()
     ks = constraints.InitKeyStore('TestKeys')
-    path='root,'
+    path = 'root,'
     ks.add_keys(path=path, stores=stores)
     with pytest.raises(ValidationException):
         ks.add_keys(path=path, stores=stores)
@@ -36,6 +36,7 @@ def test_key_value_count_0_pass():
     stores = constraints.Stores()
     actual = stores.keyStore.key_value_count('dummy', '/')
     assert actual == 0
+
 
 def test_key_value_count_1_pass():
     stores = constraints.Stores()
@@ -94,9 +95,9 @@ def test_setup_key_refs_store_pass():
     stores = constraints.Stores()
     ks = constraints.SetupKeyRefsStore('TestKeyRef')
     ks.validate('refName', path='root.test', stores=stores)
-    assert (stores.refStore.refs ==
-        [constraints.KeyRef(key_name='TestKeyRef', key_value='refName',
-            ref_path='root.test')])
+    assert (stores.refStore.refs == [
+        constraints.KeyRef(key_name='TestKeyRef', key_value='refName',
+                           ref_path='root.test')])
 
 
 def test_setup_key_refs_store_string_validator_pass():
@@ -142,7 +143,8 @@ def test_check_keys_single_key_no_stores():
     ks = constraints.InitKeyStore('FieldKey')
     ks.add_keys(path='root.register[0]', stores=stores)
     ck = constraints.CheckKeys(key_names='FieldKey', level=1)
-    assert ck.validate('field22', path='root.register[0].field[2]') == 'field22'
+    actual = ck.validate('field22', path='root.register[0].field[2]')
+    assert actual == 'field22'
 
 
 def test_check_keys_single_key_stores_type_error():
@@ -212,8 +214,8 @@ def test_check_keys_three_keys_pass():
     ks.add_keys(path=path, stores=stores)
     ck = constraints.CheckKeys(key_names=['OtherKey', 'FieldKey',
                                           'YetAnotherKey'], level=1)
-    expected = {'FieldKey:root.register[0]':
-                    {'field2': 'root.register[0].field[2]'}}
+    expected = {'FieldKey:root.register[0]': {
+        'field2': 'root.register[0].field[2]'}}
     ck.validate('field2', path=path+'.field[2]', stores=stores)
     assert stores.keyStore.keys == expected
 

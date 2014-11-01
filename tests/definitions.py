@@ -6,10 +6,14 @@ from xmodels.models import SequenceModel, SequenceElement, Choice
 
 __author__ = 'bernd'
 
+SPIRIT_NS = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+POWER_VE = "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0"
+
 
 class IsASubModel(Model):
     first = IntegerField(default=0)
     dt = DateTimeField()
+
 
 class HasAModelField(Model):
     first = ModelField(IsASubModel)
@@ -24,9 +28,8 @@ class ChildModel(SequenceModel):
 
     class Meta:
         sequence = [
-        SequenceElement('name', min_occurs=1),
-        SequenceElement('tags'),
-        ]
+            SequenceElement('name', min_occurs=1), SequenceElement('tags'),
+            ]
 
 
 class VLNVAttributes(AttributeModel):
@@ -91,22 +94,22 @@ class HierarchicalSequenceModel(SequenceModel):
     @staticmethod
     def gen_parent_min_dict():
         return dict(name='test',
-                    busRef={'@vendor':'vendor.com',
-                            '@library':'testLibrary',
-                            '@name':'BusName',
-                            '@version':'v1.0'},
+                    busRef={'@vendor': 'vendor.com',
+                            '@library': 'testLibrary',
+                            '@name': 'BusName',
+                            '@version': 'v1.0'},
                     loadConstraint='medium')
 
     @staticmethod
     def gen_child_min_dict():
-        return {'name':'child', '@alignment':'serial'}
+        return {'name': 'child', '@alignment': 'serial'}
 
 
 name_spaces = {
-    "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009": "spirit",
+    SPIRIT_NS: "spirit",
     "http://www.w3.org/2001/XMLSchema-instance": "xsi",
     "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE": "accellera",
-    "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0":
+    POWER_VE:
         "accellera-power",
 }
 schema_locations = [
@@ -126,7 +129,7 @@ class Vector(SequenceModel):
             SequenceElement('left', min_occurs=1),
             SequenceElement('right', min_occurs=1),
         ]
-        name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        name_space = SPIRIT_NS
 
 
 class LogicalWirePowerDef(SequenceModel):
@@ -144,7 +147,7 @@ class LogicalWirePowerDef(SequenceModel):
             SequenceElement('reset'),
             SequenceElement('vector'),
         ]
-        name_space = "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0"
+        name_space = POWER_VE
 
 
 class LogicalWirePowerDefs(SequenceModel):
@@ -154,11 +157,11 @@ class LogicalWirePowerDefs(SequenceModel):
         sequence = [
             SequenceElement('logicalWirePowerDef'),
         ]
-        name_space = "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0"
+        name_space = POWER_VE
 
 
 class AccelleraLogicalWire(SequenceModel):
-    id = AttributeField(ID(name_space="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"))
+    id = AttributeField(ID(name_space=SPIRIT_NS))
     logicalWirePowerDefs = ModelField(LogicalWirePowerDefs)
 
     class Meta:
@@ -175,7 +178,7 @@ class VendorExtensions(SequenceModel):
         sequence = [
             SequenceElement('logicalWire'),
         ]
-        name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        name_space = SPIRIT_NS
 
 
 class Wire(SequenceModel):
@@ -196,7 +199,7 @@ class Wire(SequenceModel):
                 SequenceElement('defaultValue', min_occurs=1),
                 SequenceElement('requiresDriver', min_occurs=1)])
         ]
-        name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        name_space = SPIRIT_NS
 
 
 class Port(SequenceModel):
@@ -218,7 +221,7 @@ class Port(SequenceModel):
             ]),
             SequenceElement('vendorExtensions'),
         ]
-        name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        name_space = SPIRIT_NS
 
 
 class LibraryRef(AttributeModel):
@@ -228,7 +231,7 @@ class LibraryRef(AttributeModel):
     version = CharField()
 
     class Meta:
-        name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        name_space = SPIRIT_NS
 
 
 class Ports(SequenceModel):
@@ -236,7 +239,7 @@ class Ports(SequenceModel):
 
     class Meta:
         sequence = [SequenceElement('port', min_occurs=1)]
-        name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        name_space = SPIRIT_NS
 
 
 class AbstractDefinition(SequenceModel):
@@ -260,5 +263,4 @@ class AbstractDefinition(SequenceModel):
             SequenceElement('ports', min_occurs=1),
             SequenceElement('description'),
         ]
-        name_space = "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
-
+        name_space = SPIRIT_NS

@@ -1,3 +1,6 @@
+import json
+import os
+
 try:
     from collections import OrderedDict
 except ImportError:
@@ -72,7 +75,8 @@ class TestElementNoAttributes(object):
             setattr(self.instance, '@extra', 'attribute')
 
     def test_extra_element_from_dict_fail(self):
-        reg_dict = dict((key, value) for (key, value) in self.register_dict.items())
+        reg_dict = dict((key, value)
+                        for (key, value) in self.register_dict.items())
         reg_dict['extra_element'] = 'causing an error'
         errors = []
         self.cls.from_dict(reg_dict, errors=errors)
@@ -116,10 +120,10 @@ class TestElementWithAttributes(object):
         assert self.instance.size.resolve == 'resolve'
 
     def test_str(self):
-        assert str(self.instance) == "Register(Model): 'addressOffset': IntegerField, " \
-                                     "'id': AttributeField, " \
-                                     "'name': CharField, " \
-                                     "'size': ModelField: Size"
+        expected = "Register(Model): 'addressOffset': IntegerField, " \
+                   "'id': AttributeField, 'name': CharField, " \
+                   "'size': ModelField: Size"
+        assert str(self.instance) == expected
         assert str(self.instance) == repr(self.instance)
 
 
@@ -258,7 +262,8 @@ class TestChoiceListOptions():
         assert len(errors) == 1
 
     def test_match_second(self):
-        sequence = self.choice.match_choice_keys(set(['optional2', 'or_second']))
+        sequence = self.choice.match_choice_keys(set(['optional2',
+                                                      'or_second']))
         assert sequence == ['optional2', 'or_second']
 
     def test_match_third(self):
@@ -297,19 +302,17 @@ class TestChoiceMixedOptions():
 
     def test_match_first_error(self):
         errors = []
-        self.choice.match_choice_keys(set(['either_first', 'no_match'])
-                                      ,
+        self.choice.match_choice_keys(set(['either_first', 'no_match']),
                                       errors=errors)
         assert len(errors) == 1
 
     def test_match_second(self):
-        sequence = self.choice.match_choice_keys(set(['optional2', 'or_second'])
-        )
+        sequence = self.choice.match_choice_keys(set(['optional2',
+                                                      'or_second']))
         assert sequence == ['optional2', 'or_second']
 
     def test_match_third(self):
-        sequence = self.choice.match_choice_keys(set(['or_perhaps_third'])
-        )
+        sequence = self.choice.match_choice_keys(set(['or_perhaps_third']))
         assert sequence == ['or_perhaps_third']
 
 
@@ -339,7 +342,6 @@ class TestSequenceModel():
         self.instance.match_sequence(['busRef', 'name', 'marketShare'],
                                      errors=errors)
         assert len(errors) == 1
-
 
     def test_match_sequence_extra_fail(self):
         errors = []
@@ -381,7 +383,9 @@ class TestNameSpacePrefix():
                           'spirit:right': '0'}}]}}}
         cls.raw_data = d
         cls.inst = VendorExtensions.from_dict(d, name_spaces=name_spaces)
-        cls.lwpDefs = [lwpDef for lwpDef in cls.inst.logicalWire.logicalWirePowerDefs.logicalWirePowerDef]
+        lwpd = cls.inst.logicalWire.logicalWirePowerDefs.logicalWirePowerDef
+        cls.lwpDefs = [lwpDef for lwpDef in lwpd]
+        cls.LD = 'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs'
 
     def test_isolation(self):
         assert self.lwpDefs[0].isolation == 'L'
@@ -402,24 +406,21 @@ class TestNameSpacePrefix():
         assert self.inst._path == 'VendorExtensions'
 
     def test_wire_path(self):
-        assert self.inst.logicalWire._path == \
-               'VendorExtensions.AccelleraLogicalWire'
+        expected = 'VendorExtensions.AccelleraLogicalWire'
+        assert self.inst.logicalWire._path == expected
 
     def test_wire_power_defs_path(self):
-        assert self.inst.logicalWire.logicalWirePowerDefs._path == \
-               'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs'
+        assert self.inst.logicalWire.logicalWirePowerDefs._path == self.LD
 
     def test_wire_power_def0_path(self):
-        assert self.lwpDefs[0]._path == \
-               'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs.LogicalWirePowerDef[0]'
+        assert self.lwpDefs[0]._path == self.LD + '.LogicalWirePowerDef[0]'
 
     def test_wire_power_def1_path(self):
-        assert self.lwpDefs[1]._path == \
-               'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs.LogicalWirePowerDef[1]'
+        assert self.lwpDefs[1]._path == self.LD + '.LogicalWirePowerDef[1]'
 
     def test_vector_path(self):
-        assert self.lwpDefs[1].vector._path == \
-               'VendorExtensions.AccelleraLogicalWire.LogicalWirePowerDefs.LogicalWirePowerDef[1].Vector'
+        expected = self.LD + '.LogicalWirePowerDef[1].Vector'
+        assert self.lwpDefs[1].vector._path == expected
 
     def test_do_dict(self):
         d = {'accellera:logicalWire': {
@@ -574,29 +575,10 @@ class TestSerialize():
 class TestXMLDict():
     @classmethod
     def setup_class(cls):
-        d = {'spirit:abstractionDefinition': {
-        '@xmlns:accellera': 'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE',
-        '@xmlns:accellera-power': 'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0',
-        '@xmlns:spirit': 'http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009',
-        '@xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
-        '@xsi:schemaLocation': 'http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009 '
-                               'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009/index.xsd '
-                               'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE '
-                               'http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE-1.0/index.xsd',
-        'spirit:busType': {'@spirit:library': 'test', '@spirit:name': 'busdef',
-                           '@spirit:vendor': 'Mds', '@spirit:version': '1.0'},
-        'spirit:library': 'test', 'spirit:name': 'absdef', 'spirit:ports': {
-        'spirit:port': [{'spirit:logicalName': 'lo1', 'spirit:wire': None},
-                        {'spirit:logicalName': 'lo2',
-                         'spirit:vendorExtensions': {'accellera:logicalWire': {
-                         'accellera-power:logicalWirePowerDefs': {
-                         'accellera-power:logicalWirePowerDef': {
-                         'accellera-power:domain': 'domain4',
-                         'accellera-power:idle': '1',
-                         'accellera-power:isolation': 'Z',
-                         'accellera-power:reset': '0'}}}},
-                         'spirit:wire': None}]}, 'spirit:vendor': 'Mds',
-        'spirit:version': '1.0'}}
+        tests_path = os.path.split(os.path.abspath(__file__))[0]
+        fn = os.path.join(tests_path, 'abstractDefinition.json')
+        with open(fn) as ad_jfile:
+            d = json.load(ad_jfile)
         cls.in_dict = d
 
     def test_from_xml(self):
@@ -609,8 +591,8 @@ class TestXMLDict():
                            ('idle', '1'),
                            ('reset', '0')])
         ve_data = OrderedDict([('logicalWire', OrderedDict([
-                ('logicalWirePowerDefs', OrderedDict([
-                    ('logicalWirePowerDef', [lwp])]))]))])
+            ('logicalWirePowerDefs',
+             OrderedDict([('logicalWirePowerDef', [lwp])]))]))])
         expected = OrderedDict([
             ('vendor', 'Mds'),
             ('library', 'test'),
@@ -622,17 +604,11 @@ class TestXMLDict():
                  ('@library', 'test'),
                  ('@name', 'busdef'),
                  ('@version', '1.0')])),
-             ('ports', OrderedDict([
-                 ('port', [
-                         OrderedDict([
-                             ('logicalName', 'lo1'),
-                             ('wire', None),
-                         ]),
-                         OrderedDict([
-                         ('logicalName', 'lo2'),
-                         ('wire', None),
-                         ('vendorExtensions', ve_data)
-                        ])
-                    ]
-                 )]))])
+            ('ports', OrderedDict([
+                ('port', [OrderedDict([('logicalName', 'lo1'),
+                                       ('wire', None), ]),
+                          OrderedDict([('logicalName', 'lo2'), ('wire', None),
+                                       ('vendorExtensions', ve_data)])])
+            ]))
+        ])
         assert inst.serialize() == expected

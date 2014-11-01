@@ -1,0 +1,43 @@
+{
+  "spirit:abstractionDefinition": {
+    "spirit:ports": {
+      "spirit:port": [
+        {
+          "spirit:logicalName": "lo1",
+          "spirit:wire": null
+        },
+        {
+          "spirit:logicalName": "lo2",
+          "spirit:vendorExtensions": {
+            "accellera:logicalWire": {
+              "accellera-power:logicalWirePowerDefs": {
+                "accellera-power:logicalWirePowerDef": {
+                  "accellera-power:reset": "0",
+                  "accellera-power:isolation": "Z",
+                  "accellera-power:domain": "domain4",
+                  "accellera-power:idle": "1"
+                }
+              }
+            }
+          },
+          "spirit:wire": null
+        }
+      ]
+    },
+    "@xmlns:spirit": "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009",
+    "spirit:vendor": "Mds",
+    "spirit:busType": {
+      "@spirit:name": "busdef",
+      "@spirit:library": "test",
+      "@spirit:vendor": "Mds",
+      "@spirit:version": "1.0"
+    },
+    "@xmlns:accellera": "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE",
+    "spirit:name": "absdef",
+    "spirit:version": "1.0",
+    "spirit:library": "test",
+    "@xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+    "@xmlns:accellera-power": "http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE/POWER-1.0",
+    "@xsi:schemaLocation": "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009 http://www.accellera.org/XMLSchema/SPIRIT/1685-2009/index.xsd http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE http://www.accellera.org/XMLSchema/SPIRIT/1685-2009-VE-1.0/index.xsd"
+  }
+}
