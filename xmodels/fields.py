@@ -179,19 +179,21 @@ class CharField(BaseField):
         >>> char_field = CharField()
         >>> char_field.validate(' valid unicode string!\\n')
         'valid unicode string!'
-        >>> CharField().validate(42)
-        Traceback (most recent call last):
-        ...
-        ValidationException: ValidationException: Expecting a string, value:42
-        >>> CharField(minLength=8).validate('0123')
-        Traceback (most recent call last):
-        ...
-        ValidationException: ValidationException: Expecting string longer than 8 characters, value:'0123'
-        >>> CharField(maxLength=8).validate('0123456789')
-        Traceback (most recent call last):
-        ...
-        ValidationException: ValidationException: Expecting string shorter than 8 characters, value:'0123456789'
     """
+    # >>> CharField().validate(42)
+    # Traceback (most recent call last):
+    # ...
+    # ValidationException: ValidationException: Expecting a string, value:42
+    # >>> CharField(minLength=8).validate('0123')
+    # Traceback (most recent call last):
+    # ...
+    # ValidationException: ValidationException: \
+    # Expecting string longer than 8 characters, value:'0123'
+    # >>> CharField(maxLength=8).validate('0123456789')
+    # Traceback (most recent call last):
+    # ...
+    # ValidationException: ValidationException: \
+    # Expecting string shorter than 8 characters, value:'0123456789'
     strip = True
     minLength = None
     maxLength = None
@@ -278,13 +280,14 @@ class Name(RegexField):
         >>> name_field = Name()
         >>> name_field.validate('valid_name')
         'valid_name'
-        >>> name_field.validate('illegal!')
-        Traceback (most recent call last):
-        ...
-        ValidationException: ValidationException: A name needs to begin with a letter, colon (:), or
-        underscore (_) and shall only contain letters, numbers, and the colon (:),
-        underscore (_), dash (-), and dot (.) characters. Only one colon (:) total., value:'illegal!'
     """
+    # >>> name_field.validate('illegal!')
+    # Traceback (most recent call last):
+    # ...
+    # ValidationException: ValidationException: A name needs to begin with a
+    # letter, colon (:), or underscore (_) and shall only contain letters,
+    # numbers, and the colon (:), underscore (_), dash (-), and dot (.)
+    # characters. Only one colon (:) total., value:'illegal!'
     regex = r'^[a-zA-Z:_][\w:_\-\.]*$'
     messages = dict(
         no_match="""A name needs to begin with a letter, colon (:), or
@@ -558,7 +561,8 @@ class EnumField(CharField):
         if not self.lookup:
             self.lookup = set(item for item in self.options)
         if not self.lookup_lower:
-            self.lookup_lower = dict((item.lower(), item) for item in self.options)
+            self.lookup_lower = dict((item.lower(), item)
+                                     for item in self.options)
         if string_value in self.lookup:
             return string_value
         lower_case_value = string_value.lower()

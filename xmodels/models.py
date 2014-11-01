@@ -4,7 +4,7 @@ from six import with_metaclass
 from .fields import BaseField, WrappedObjectField, ValidationException, \
     RequiredAttribute, AttributeField
 from .constraints import Stores
-from .utils import CommonEqualityMixin, MessageRecord
+from .utils import CommonEqualityMixin, MsgRecord
 
 
 logger = logging.getLogger(__name__)
@@ -140,8 +140,8 @@ class Options(object):
     def __init__(self, meta):
         self.key_to_source = None
         self.source_to_key = None
-        self.allow_extra_element_fields = False
-        self.allow_extra_attribute_fields = False
+        self.allow_extra_elements = False
+        self.allow_extra_attributes = False
         if meta:
             for key, value in meta.items():
                 self.__dict__[key] = value
@@ -194,22 +194,22 @@ class Model(with_metaclass(ModelType)):
     for AttributeModel and SequenceModel implementing common logic.
 
     Usually one defines a number of fields as class variables. Fields may have
-    default values. All fields can be assigned and read. A read to a field which
-    has not been set previously return the default value if one exists or None. The
-    validate method validates all fields defined as class variables.
+    default values. All fields can be assigned and read. A read to a field
+    which has not been set previously return the default value if one exists or
+     None. The validate method validates all fields defined as class variables.
 
-    Instance variables may be created in addition to the fields specified as class
-     variables if Meta.allow_extra_element_fields is True. Otherwise the model
-     validation fails. The validation results are stored in a logger instance.
+    Instance variables may be created in addition to the fields specified as
+    class variables if Meta.allow_extra_elements is True. Otherwise the
+    model validation fails. The validation results are stored in a logger
+    instance.
     """
     class Meta:
-        allow_extra_element_fields = False
-        allow_extra_attribute_fields = False
+        allow_extra_elements = False
+        allow_extra_attributes = False
         value_key = 'value'
         required_attributes = None
         initial = None
         sequence = None
-
 
     def __init__(self):
         self._extra = {}
@@ -217,10 +217,11 @@ class Model(with_metaclass(ModelType)):
         self._path = ''
         self._non_empty_fields = set([])
 
-    def __str__(self): return '%s(%s): %s' % (self.__class__.__name__,
-                                              self.__class__.__base__.__name__,
-                                              ', '.join(["'%s': %s" % (k, v)
-                                                         for k, v in sorted(self._fields.items())]))
+    def __str__(self):
+        return '%s(%s): %s' % (self.__class__.__name__,
+                               self.__class__.__base__.__name__,
+                               ', '.join(["'%s': %s" % (k, v) for k, v in
+                                          sorted(self._fields.items())]))
 
     def __repr__(self):
         return self.__str__()
@@ -240,9 +241,9 @@ class Model(with_metaclass(ModelType)):
                 self._non_empty_fields.add(key)
         elif key.startswith('_'):
             self.__dict__[key] = value
-        elif key[0] == '@' and self._meta.allow_extra_attribute_fields:
+        elif key[0] == '@' and self._meta.allow_extra_attributes:
             self._extra[key] = value
-        elif key[0] != '@' and self._meta.allow_extra_element_fields:
+        elif key[0] != '@' and self._meta.allow_extra_elements:
             self._extra[key] = value
         else:
             raise AttributeError
@@ -312,19 +313,22 @@ class Model(with_metaclass(ModelType)):
                     kwargs['path'] = self._path
                     self._data[key] = field.validate(data, **kwargs)
                 except ValidationException as e:
-                    msg_rec = MessageRecord(path=self._path, field=key,
-                                            msg=e.msg)
+                    msg_rec = MsgRecord(path=self._path, field=key, msg=e.msg)
                     error(logger, msg_rec, **kwargs)
         if self._extra:
-            extra_attributes = [key for key in self._extra.keys() if key.startswith('@')]
-            extra_elements = [key for key in self._extra.keys() if key not in extra_attributes]
-            if extra_attributes and not self._meta.allow_extra_attribute_fields:
-                msg = 'Found extra attribute fields: %s' % ','.join(extra_attributes)
-                msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
+            extra_attributes = [key for key in self._extra.keys()
+                                if key.startswith('@')]
+            extra_elements = [key for key in self._extra.keys()
+                              if key not in extra_attributes]
+            if extra_attributes and not self._meta.allow_extra_attributes:
+                attrs_str = ','.join(extra_attributes)
+                msg = 'Found extra attribute fields: %s' % attrs_str
+                msg_rec = MsgRecord(path=self._path, field='_extra', msg=msg)
                 error(logger, msg_rec, **kwargs)
-            if extra_elements and not self._meta.allow_extra_element_fields:
-                msg = 'Found extra element fields: %s' % ','.join(extra_elements)
-                msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
+            if extra_elements and not self._meta.allow_extra_elements:
+                els_str = ','.join(extra_elements)
+                msg = 'Found extra element fields: %s' % els_str
+                msg_rec = MsgRecord(path=self._path, field='_extra', msg=msg)
                 error(logger, msg_rec, **kwargs)
         return self
 
@@ -336,8 +340,7 @@ class Model(with_metaclass(ModelType)):
                     kwargs['path'] = self._path
                     self._data[key] = field.deserialize(data, **kwargs)
                 except ValidationException as e:
-                    msg_rec = MessageRecord(path=self._path, field=key,
-                                            msg=e.msg)
+                    msg_rec = MsgRecord(path=self._path, field=key, msg=e.msg)
                     error(logger, msg_rec, **kwargs)
         return self
 
@@ -353,13 +356,12 @@ class Model(with_metaclass(ModelType)):
                     kwargs['path'] = self._path
                     serialized_key = self._meta.key_to_source[key]
                     serialized_data = field.serialize(value, **kwargs)
-                    if serialized_data =={}:
+                    if serialized_data == {}:
                         result[serialized_key] = None
                     else:
                         result[serialized_key] = serialized_data
                 except ValidationException as e:
-                    msg_rec = MessageRecord(path=self._path, field=key,
-                                            msg=e.msg)
+                    msg_rec = MsgRecord(path=self._path, field=key, msg=e.msg)
                     error(logger, msg_rec, **kwargs)
         result.update(self._extra)
         return result
@@ -424,7 +426,8 @@ class SequenceModel(Model):
         if self._meta.initial is not None:
             if kwargs.get('stores') is None:
                 kwargs['stores'] = Stores()
-            self._meta.initial.add_keys(path=self._path, stores=kwargs['stores'])
+            self._meta.initial.add_keys(path=self._path,
+                                        stores=kwargs['stores'])
         super(SequenceModel, self).validate(**kwargs)
         element_tags = []
         for tag in self._non_empty_fields:
@@ -443,8 +446,8 @@ class SequenceModel(Model):
                     result_sequence.append(field.tag)
                 elif field.required:
                     msg = "Missing required key: %s %s" % (field.tag, path)
-                    msg_rec = MessageRecord(path=self._path, field=field.tag,
-                                            msg=msg)
+                    msg_rec = MsgRecord(path=self._path, field=field.tag,
+                                        msg=msg)
                     error(logger, msg_rec, **kwargs)
             elif isinstance(field, Choice):
                 choice_keys_sey = set(value_tags) & field.all_keys_set
@@ -454,7 +457,7 @@ class SequenceModel(Model):
         extra_tags = [tag for tag in value_tags if tag not in result_sequence]
         if extra_tags:
             msg = "Could not match tag(s): %s" % ', '.join(extra_tags)
-            msg_rec = MessageRecord(path=self._path, field='_extra', msg=msg)
+            msg_rec = MsgRecord(path=self._path, field='_extra', msg=msg)
             error(logger, msg_rec, **kwargs)
         return result_sequence
 

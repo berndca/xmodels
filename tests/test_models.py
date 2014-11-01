@@ -16,7 +16,7 @@ from tests.definitions import HierarchicalSequenceModel, Size, \
     VendorExtensions, name_spaces, Port, AbstractDefinition, LibraryRef
 from xmodels import CharField, Model, IntegerField, ModelField, SequenceModel
 from xmodels.models import SequenceElement, Choice
-from xmodels.utils import MessageRecord
+from xmodels.utils import MsgRecord
 
 
 class TestElementNoAttributes(object):
@@ -63,7 +63,7 @@ class TestElementNoAttributes(object):
         self.instance.size.resolve = True
         errors = []
         self.instance.validate(errors=errors)
-        assert errors == [MessageRecord(path='Register.Size', field='resolve',
+        assert errors == [MsgRecord(path='Register.Size', field='resolve',
                                         msg='Expecting a string')]
 
     def test_extra_element_fail(self):
@@ -80,7 +80,7 @@ class TestElementNoAttributes(object):
         reg_dict['extra_element'] = 'causing an error'
         errors = []
         self.cls.from_dict(reg_dict, errors=errors)
-        assert errors == [MessageRecord(
+        assert errors == [MsgRecord(
             path='Register', field='_extra',
             msg='Found extra element fields: extra_element')]
 
@@ -159,8 +159,8 @@ class TestModelExtra(object):
             size = ModelField(Size)
 
             class Meta:
-                allow_extra_element_fields = True
-                allow_extra_attribute_fields = True
+                allow_extra_elements = True
+                allow_extra_attributes = True
 
         cls.cls = Extras
         cls.instance = Extras()
@@ -462,7 +462,7 @@ class TestSerialization(object):
         inst = self.cls.from_dict(self.basic_dict)
         inst.probability = 'not a number'
         inst.deserialize(errors=errors)
-        assert errors == [MessageRecord(path='Basic', field='probability',
+        assert errors == [MsgRecord(path='Basic', field='probability',
                                         msg='Could not convert to float:')]
 
     def test_serialize_pass(self):
@@ -480,7 +480,7 @@ class TestSerialization(object):
         inst._fields['probability'].serial_format = '{'
         errors = []
         inst.serialize(errors=errors)
-        assert errors == [MessageRecord(
+        assert errors == [MsgRecord(
             path='Basic', field='probability',
             msg='Could not convert float to string with format {.')]
 
@@ -514,7 +514,7 @@ class TestSequenceModels():
         seq_data = dict(name='test')
         errors = []
         self.cls.from_dict(seq_data, errors=errors)
-        assert errors == [MessageRecord(path='Sequence0', field='size',
+        assert errors == [MsgRecord(path='Sequence0', field='size',
                                         msg='Missing required key: size ')]
 
 
