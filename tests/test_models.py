@@ -64,7 +64,7 @@ class TestElementNoAttributes(object):
         errors = []
         self.instance.validate(errors=errors)
         assert errors == [MsgRecord(path='Register.Size', field='resolve',
-                                        msg='Expecting a string')]
+                                    msg='Expecting a string')]
 
     def test_extra_element_fail(self):
         with pytest.raises(AttributeError):
@@ -463,7 +463,7 @@ class TestSerialization(object):
         inst.probability = 'not a number'
         inst.deserialize(errors=errors)
         assert errors == [MsgRecord(path='Basic', field='probability',
-                                        msg='Could not convert to float:')]
+                                    msg='Could not convert to float:')]
 
     def test_serialize_pass(self):
         result = self.instance.serialize()
@@ -515,7 +515,7 @@ class TestSequenceModels():
         errors = []
         self.cls.from_dict(seq_data, errors=errors)
         assert errors == [MsgRecord(path='Sequence0', field='size',
-                                        msg='Missing required key: size ')]
+                                    msg='Missing required key: size ')]
 
 
 def test_empty_modelfield():
