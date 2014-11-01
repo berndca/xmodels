@@ -38,7 +38,7 @@ class PyTest(TestCommand):
         sys.exit(errcode)
 
 requirements = [
-    'six'
+    'six', 'ordereddict'
 ]
 
 test_requirements = [

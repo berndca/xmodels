@@ -3,7 +3,7 @@ import datetime
 import pytest
 
 from tests.definitions import HasAModelField, IsASubModel, Vector, \
-    VLNVAttributes
+    VLNVAttributes, SPIRIT_NS
 from xmodels import Model, ModelField, ModelCollectionField, \
     FieldCollectionField
 from xmodels.fields import IntegerField, BooleanField, \
@@ -41,8 +41,8 @@ class TestBaseField():
             test.deserialize(None)
 
     def test_deserialize(self):
-        actual = self.cls(CharField()).deserialize('expected')
-        assert actual == 'expected'
+        actual = self.cls(CharField()).deserialize('actual')
+        assert actual == 'actual'
 
     def test_eq(self):
         inst1 = self.cls(CharField())
@@ -61,7 +61,7 @@ class TestBaseField():
         assert exc_info.value.msg == inst1.messages['required']
 
     def test_name_space_kwarg(self):
-        name_space="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        name_space = SPIRIT_NS
         id = AttributeField(CharField(name_space=name_space))
         assert id.name_space == name_space
 
@@ -101,6 +101,7 @@ class TestAttribute():
 def test_required_attribute_full_source():
     attr = RequiredAttribute(CharField(source='@id'))
     assert attr.get_source('test') == '@id'
+
 
 class TestCharField():
     @classmethod
@@ -279,16 +280,16 @@ class TestRangeField():
         assert actual == 42.0
 
     def test_range_min_fail(self):
-        expected = self.instance.messages['tooSmall'] % self.instance.min
+        actual = self.instance.messages['tooSmall'] % self.instance.min
         with pytest.raises(ValidationException) as exc_info:
             self.instance.deserialize(-42)
-        assert exc_info.value.msg == expected
+        assert exc_info.value.msg == actual
 
     def test_range_max_fail(self):
-        expected = self.instance.messages['tooLarge'] % self.instance.max
+        actual = self.instance.messages['tooLarge'] % self.instance.max
         with pytest.raises(ValidationException) as exc_info:
             self.instance.deserialize(84)
-        assert exc_info.value.msg == expected
+        assert exc_info.value.msg == actual
 
 
 class TestIntegerField():
@@ -305,16 +306,16 @@ class TestIntegerField():
         assert actual == 42
 
     def test_integer_min_fail(self):
-        expected = self.instance.messages['tooSmall'] % self.instance.min
+        actual = self.instance.messages['tooSmall'] % self.instance.min
         with pytest.raises(ValidationException) as exc_info:
             self.instance.deserialize('-42')
-        assert exc_info.value.msg == expected
+        assert exc_info.value.msg == actual
 
     def test_integer_max_fail(self):
-        expected = self.instance.messages['tooLarge'] % self.instance.max
+        actual = self.instance.messages['tooLarge'] % self.instance.max
         with pytest.raises(ValidationException) as exc_info:
             self.instance.deserialize('84')
-        assert exc_info.value.msg == expected
+        assert exc_info.value.msg == actual
 
     def test_integer_invalid_fail(self):
         with pytest.raises(ValidationException) as exc_info:
@@ -332,8 +333,8 @@ def test_non_negative_integer_fail():
     inst = NonNegativeInteger()
     with pytest.raises(ValidationException) as exc_info:
         inst.deserialize(-1)
-    expected = inst.messages['tooSmall'] % inst.min
-    assert exc_info.value.msg == expected
+    actual = inst.messages['tooSmall'] % inst.min
+    assert exc_info.value.msg == actual
 
 
 def test_positive_integer_pass():
@@ -346,8 +347,8 @@ def test_positive_integer_fail():
     inst = PositiveInteger()
     with pytest.raises(ValidationException) as exc_info:
         inst.deserialize(0)
-    expected = inst.messages['tooSmall'] % inst.min
-    assert exc_info.value.msg == expected
+    actual = inst.messages['tooSmall'] % inst.min
+    assert exc_info.value.msg == actual
 
 
 def test_negative_integer_pass():
@@ -360,8 +361,8 @@ def test_negative_integer_fail():
     inst = NegativeInteger()
     with pytest.raises(ValidationException) as exc_info:
         inst.deserialize(0)
-    expected = inst.messages['tooLarge'] % inst.max
-    assert exc_info.value.msg == expected
+    actual = inst.messages['tooLarge'] % inst.max
+    assert exc_info.value.msg == actual
 
 
 class TestFloatField():
@@ -378,16 +379,16 @@ class TestFloatField():
         assert actual == 0.0042
 
     def test_float_min_fail(self):
-        expected = self.instance.messages['tooSmall'] % self.instance.min
+        actual = self.instance.messages['tooSmall'] % self.instance.min
         with pytest.raises(ValidationException) as exc_info:
             self.instance.deserialize('-42')
-        assert exc_info.value.msg == expected
+        assert exc_info.value.msg == actual
 
     def test_float_max_fail(self):
-        expected = self.instance.messages['tooLarge'] % self.instance.max
+        actual = self.instance.messages['tooLarge'] % self.instance.max
         with pytest.raises(ValidationException) as exc_info:
             self.instance.deserialize('84')
-        assert exc_info.value.msg == expected
+        assert exc_info.value.msg == actual
 
     def test_float_invalid_fail(self):
         with pytest.raises(ValidationException) as exc_info:
@@ -399,14 +400,14 @@ class TestFloatField():
         assert self.instance.serialize(3.14) == '3.14'
 
     def test_serialize_basic_format(self):
-        self.instance.serial_format = '{:e}'
+        self.instance.serial_format = '{0:e}'
         assert self.instance.serialize(3.14) == '3.140000e+00'
 
     def test_serialize_basic_fail(self):
         self.instance.serial_format = '{invalid}'
         with pytest.raises(ValidationException) as exc_info:
             self.instance.serialize('3.14')
-        assert exc_info.value.msg == self.instance.messages['format'] %dict(
+        assert exc_info.value.msg == self.instance.messages['format'] % dict(
             format=self.instance.serial_format)
 
 
@@ -512,84 +513,82 @@ class TestISO8601DateTimeField():
 
     def test_conversion_z(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2010, 7, 13, 14, 1, 0,
-                                     tzinfo=Timezone())
-        assert expected == dt_field.deserialize("2010-07-13T14:01:00Z")
+        actual = datetime.datetime(2010, 7, 13, 14, 1, 0, tzinfo=Timezone())
+        assert actual == dt_field.deserialize("2010-07-13T14:01:00Z")
 
     def test_conversion_0(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2010, 7, 13, 14, 2, 0,
-                                     tzinfo=Timezone("-05:00"))
-        assert expected == dt_field.deserialize("2010-07-13T14:02:00-05:00")
+        actual = datetime.datetime(2010, 7, 13, 14, 2, 0,
+                                   tzinfo=Timezone("-05:00"))
+        assert actual == dt_field.deserialize("2010-07-13T14:02:00-05:00")
 
     def test_conversion_1(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2010, 7, 13, 14, 3, 0,
-                                     tzinfo=Timezone("05:30"))
-        assert expected == dt_field.deserialize("2010-07-13T14:03:00+05:30")
+        actual = datetime.datetime(2010, 7, 13, 14, 3, 0,
+                                   tzinfo=Timezone("05:30"))
+        assert actual == dt_field.deserialize("2010-07-13T14:03:00+05:30")
 
     def test_conversion_2(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2011, 1, 13, 16, 44, 00, tzinfo=Timezone())
-        assert expected == dt_field.deserialize("20110113T164400Z")
+        actual = datetime.datetime(2011, 1, 13, 16, 44, 00, tzinfo=Timezone())
+        assert actual == dt_field.deserialize("20110113T164400Z")
 
     def test_conversion_3(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2011, 1, 13, 16, 44, 00, tzinfo=Timezone())
-        assert expected == dt_field.deserialize("20110113T1644Z")
+        actual = datetime.datetime(2011, 1, 13, 16, 44, 00, tzinfo=Timezone())
+        assert actual == dt_field.deserialize("20110113T1644Z")
 
     def test_conversion_4(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2011, 1, 13, 16, 44, 00)
-        assert expected == dt_field.deserialize("20110113T164400")
+        actual = datetime.datetime(2011, 1, 13, 16, 44, 00)
+        assert actual == dt_field.deserialize("20110113T164400")
 
     def test_conversion_5(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2011, 1, 13, 16, 44, 00)
-        assert expected == dt_field.deserialize("20110113T1644")
+        actual = datetime.datetime(2011, 1, 13, 16, 44, 00)
+        assert actual == dt_field.deserialize("20110113T1644")
 
     def test_conversion_6(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2010, 2, 1)
-        assert expected == dt_field.deserialize("2010W052")
+        actual = datetime.datetime(2010, 2, 1)
+        assert actual == dt_field.deserialize("2010W052")
 
     def test_conversion_7(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2010, 2, 1, 12, 1, 15, 2,
-                                     tzinfo=Timezone())
-        assert expected == dt_field.deserialize("2010W052T120115.002Z")
+        actual = datetime.datetime(2010, 2, 1, 12, 1, 15, 2, tzinfo=Timezone())
+        assert actual == dt_field.deserialize("2010W052T120115.002Z")
 
     def test_conversion_8(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2010, 8, 22)
-        assert expected == dt_field.deserialize("2010234")
+        actual = datetime.datetime(2010, 8, 22)
+        assert actual == dt_field.deserialize("2010234")
 
     def test_conversion_9(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2010, 8, 22, 15, 52, 42, 763)
-        assert expected == dt_field.deserialize("2010234T155242.763")
+        actual = datetime.datetime(2010, 8, 22, 15, 52, 42, 763)
+        assert actual == dt_field.deserialize("2010234T155242.763")
 
     def test_conversion_a(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2007, 1, 2)
-        assert expected == dt_field.deserialize("20070102")
+        actual = datetime.datetime(2007, 1, 2)
+        assert actual == dt_field.deserialize("20070102")
 
     def test_conversion_b(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2007, 1, 2)
-        assert expected == dt_field.deserialize("070102")
+        actual = datetime.datetime(2007, 1, 2)
+        assert actual == dt_field.deserialize("070102")
 
     def test_conversion_c(self):
         dt_field = DateTimeField()
-        expected = datetime.datetime(2007, 1, 1)
-        assert expected == dt_field.deserialize("2007")
+        actual = datetime.datetime(2007, 1, 1)
+        assert actual == dt_field.deserialize("2007")
 
     def test_conversion_d(self):
         dt_field = DateTimeField()
         today = datetime.date.today()
-        expected = datetime.datetime(today.year, today.month, today.day,
-                                     16, 47, 21)
-        assert expected == dt_field.deserialize('16:47:21')
+        actual = datetime.datetime(today.year, today.month, today.day, 16, 47,
+                                   21)
+        assert actual == dt_field.deserialize('16:47:21')
 
     def test_datetime_input(self):
         datetime_input = datetime.datetime(1989, 11, 9, 15,
@@ -666,8 +665,8 @@ class TestTimeField():
     def test_iso8601_conversion(self):
         tf = TimeField()
         t = tf.deserialize("09:33:30")
-        expected = datetime.time(9, 33, 30)
-        assert expected == t
+        actual = datetime.time(9, 33, 30)
+        assert actual == t
 
     def test_value_fail(self):
         with pytest.raises(ValidationException):
@@ -680,8 +679,8 @@ class TestTimeField():
     def test_datetime_time(self):
         tf = TimeField()
         t = tf.deserialize(datetime.time(9, 33, 30))
-        expected = datetime.time(9, 33, 30)
-        assert expected == t
+        actual = datetime.time(9, 33, 30)
+        assert actual == t
 
     def test_datetime(self):
         dt = datetime.datetime(1989, 11, 9, 9, 33, 30)
@@ -694,7 +693,6 @@ class TestTimeField():
         assert self.field.serialize(datetime.time(9, 33, 30)) == "09.33.30"
 
 
-
 class TestTimeFieldISO8601():
 
     def test_time_colons(self):
@@ -704,8 +702,8 @@ class TestTimeFieldISO8601():
         assert TimeField().deserialize('164721') == datetime.time(16, 47, 21)
 
     def test_time_just_digits2(self):
-        expected = datetime.time(16, 47, 21, 854)
-        assert TimeField().deserialize('16:47:21.854Z') == expected
+        actual = datetime.time(16, 47, 21, 854)
+        assert TimeField().deserialize('16:47:21.854Z') == actual
 
 
 class TestModelFieldBasic():
@@ -745,7 +743,7 @@ class TestModelFieldBasic():
     def test_get_name_space(self):
         inst = ModelField(Vector)
         ns = inst.name_space
-        assert ns == "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        assert ns == SPIRIT_NS
 
     def test_get_name_space_none(self):
         inst = ModelField(VLNVAttributes)
@@ -830,7 +828,7 @@ class TestModelCollectionField():
         sm = [IsASubModel(), IsASubModel()]
         sm[0].first = 1
         sm[0].dt = datetime.datetime(1973, 9, 11, 5)
-        sm[1].first= 42
+        sm[1].first = 42
         sm[1].dt = datetime.datetime(1945, 8, 9, 11, 2)
         actual = mc.serialize(sm)
         assert actual == [
@@ -838,13 +836,13 @@ class TestModelCollectionField():
             {'dt': '1945-08-09T11:02:00', 'first': 42}
         ]
 
+
 class TestModelCollectionFieldFromDict():
     @classmethod
     def setup_class(cls):
         class Post(Model):
             title = CharField()
             created = DateTimeField()
-
 
         class User(Model):
             name = CharField()
@@ -877,8 +875,9 @@ class TestModelCollectionFieldFromDict():
         assert self.eric.posts[0].title == 'Post #1'
 
     def test_created_1(self):
-        expected = datetime.datetime(2010, 7, 13, 14, 3)
-        assert self.eric.posts[1].created == expected
+        actual = datetime.datetime(2010, 7, 13, 14, 3)
+        assert self.eric.posts[1].created == actual
+
 
 class TestFieldCollectionFieldBasic():
 
@@ -907,7 +906,7 @@ class TestFieldCollectionFieldBasic():
         data = ['2012-12-25', '2013-07-04T08:55:00']
         actual = dt_list.deserialize(data)
         assert actual == [datetime.datetime(2012, 12, 25),
-                          datetime.datetime(2013, 7, 4,8,55)]
+                          datetime.datetime(2013, 7, 4, 8, 55)]
 
     def test_date_time_error(self):
         dt_list = FieldCollectionField(DateTimeField())
@@ -918,7 +917,7 @@ class TestFieldCollectionFieldBasic():
     def test_get_name_space(self):
         inst = ModelCollectionField(Vector)
         ns = inst.name_space
-        assert ns == "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"
+        assert ns == SPIRIT_NS
 
     def test_get_name_space_none(self):
         inst = ModelCollectionField(VLNVAttributes)

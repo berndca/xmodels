@@ -88,7 +88,7 @@ class Choice(CommonEqualityMixin):
             else:
                 assert isinstance(option, SequenceElement), assert_msg
                 flattened.append(option)
-        return {option.tag: option for option in flattened}
+        return dict((option.tag, option) for option in flattened)
 
     def choice_to_key_sets(self, required):
         key_sets = [set([]) for option in self.options]
@@ -265,8 +265,8 @@ class Model(with_metaclass(ModelType)):
         for key, field in self._clsfields.items():
             source = field.get_source(key, name_spaces, default_prefix)
             self._meta.source_to_key[source] = key
-        self._meta.key_to_source = {value: key for key, value in
-                               self._meta.source_to_key.items()}
+        self._meta.key_to_source = dict(
+            [(value, key) for key, value in self._meta.source_to_key.items()])
 
     def _find_field(self, name):
         if name in self._meta.source_to_key:
