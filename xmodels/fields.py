@@ -13,7 +13,10 @@ Field Methods
 
 """
 
-from collections import OrderedDict
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 import datetime
 import logging
 import re
@@ -553,9 +556,9 @@ class EnumField(CharField):
     def validate(self, raw_data, **kwargs):
         string_value = super(EnumField, self).validate(raw_data, **kwargs)
         if not self.lookup:
-            self.lookup = {item for item in self.options}
+            self.lookup = set(item for item in self.options)
         if not self.lookup_lower:
-            self.lookup_lower = {item.lower(): item for item in self.options}
+            self.lookup_lower = dict((item.lower(), item) for item in self.options)
         if string_value in self.lookup:
             return string_value
         lower_case_value = string_value.lower()
@@ -785,7 +788,7 @@ class ModelCollectionField(WrappedObjectField):
         result = []
         for index, item in enumerate(raw_data):
             path = kwargs.get('path', '<inst>') + '[%d]' % index
-            kwargs_copy = {key: value for key, value in kwargs.items()}
+            kwargs_copy = dict((key, value) for key, value in kwargs.items())
             kwargs_copy.update(path=path)
             obj = super(ModelCollectionField, self).populate(item,
                                                              **kwargs_copy)

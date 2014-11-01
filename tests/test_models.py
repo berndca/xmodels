@@ -1,4 +1,7 @@
-from collections import OrderedDict
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 import datetime
 
 import pytest
@@ -69,7 +72,7 @@ class TestElementNoAttributes(object):
             setattr(self.instance, '@extra', 'attribute')
 
     def test_extra_element_from_dict_fail(self):
-        reg_dict = {key: value for key, value in self.register_dict.items()}
+        reg_dict = dict((key, value) for (key, value) in self.register_dict.items())
         reg_dict['extra_element'] = 'causing an error'
         errors = []
         self.cls.from_dict(reg_dict, errors=errors)
@@ -209,15 +212,15 @@ class TestChoiceScalarOptions():
         ])
 
     def test_match_first(self):
-        sequence = self.choice.match_choice_keys({'either_first'})
+        sequence = self.choice.match_choice_keys(set(['either_first']))
         assert sequence == ['either_first']
 
     def test_match_second(self):
-        sequence = self.choice.match_choice_keys({'or_second'})
+        sequence = self.choice.match_choice_keys(set(['or_second']))
         assert sequence == ['or_second']
 
     def test_match_third(self):
-        sequence = self.choice.match_choice_keys({'or_perhaps_third'})
+        sequence = self.choice.match_choice_keys(set(['or_perhaps_third']))
         assert sequence == ['or_perhaps_third']
 
 
@@ -244,21 +247,22 @@ class TestChoiceListOptions():
         ])
 
     def test_match_first(self):
-        sequence = self.choice.match_choice_keys({'either_first', 'optional1'})
+        sequence = self.choice.match_choice_keys(set(['either_first',
+                                                      'optional1']))
         assert sequence == ['either_first', 'optional1']
 
     def test_match_first_error(self):
         errors = []
-        self.choice.match_choice_keys({'either_first', 'no_match'},
+        self.choice.match_choice_keys(set(['either_first', 'no_match']),
                                       errors=errors)
         assert len(errors) == 1
 
     def test_match_second(self):
-        sequence = self.choice.match_choice_keys({'optional2', 'or_second'})
+        sequence = self.choice.match_choice_keys(set(['optional2', 'or_second']))
         assert sequence == ['optional2', 'or_second']
 
     def test_match_third(self):
-        sequence = self.choice.match_choice_keys({'or_perhaps_third'})
+        sequence = self.choice.match_choice_keys(set(['or_perhaps_third']))
         assert sequence == ['or_perhaps_third']
 
     def test_str(self):
@@ -286,21 +290,26 @@ class TestChoiceMixedOptions():
         ])
 
     def test_match_first(self):
-        sequence = self.choice.match_choice_keys({'either_first', 'optional1'})
+        sequence = self.choice.match_choice_keys(
+            set(['either_first', 'optional1'])
+        )
         assert sequence == ['either_first', 'optional1']
 
     def test_match_first_error(self):
         errors = []
-        self.choice.match_choice_keys({'either_first', 'no_match'},
+        self.choice.match_choice_keys(set(['either_first', 'no_match'])
+                                      ,
                                       errors=errors)
         assert len(errors) == 1
 
     def test_match_second(self):
-        sequence = self.choice.match_choice_keys({'optional2', 'or_second'})
+        sequence = self.choice.match_choice_keys(set(['optional2', 'or_second'])
+        )
         assert sequence == ['optional2', 'or_second']
 
     def test_match_third(self):
-        sequence = self.choice.match_choice_keys({'or_perhaps_third'})
+        sequence = self.choice.match_choice_keys(set(['or_perhaps_third'])
+        )
         assert sequence == ['or_perhaps_third']
 
 

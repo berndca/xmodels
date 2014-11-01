@@ -399,7 +399,7 @@ class TestFloatField():
         assert self.instance.serialize(3.14) == '3.14'
 
     def test_serialize_basic_format(self):
-        self.instance.serial_format = '{:e}'
+        self.instance.serial_format = '{0:e}'
         assert self.instance.serialize(3.14) == '3.140000e+00'
 
     def test_serialize_basic_fail(self):
