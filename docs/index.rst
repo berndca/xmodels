@@ -1,39 +1,11 @@
-.. _index:
+.. xmodels documentation master file, created by
+   sphinx-quickstart on Sun Nov 2 2014.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
 
-.. include:: ../README.rst
+Welcome to Python Boilerplate's documentation!
+======================================
 
-
-Installing
-==========
-
-
-Install stable releases of Schematics with ``pip``.
-
-::
-
-  $ pip install schematics
-
-See the :doc:`install` for more detail.
-
-
-.. include:: toc.rst
-
-
-Development
-===========
-
-We welcome ideas and code.  We ask that you follow some of our guidelines
-though.
-
-See the :doc:`development` for more information.
-
-
-.. include:: community.rst
-
-Contents:
-
-.. toctree::
-   :maxdepth: 2
 Contents:
 
 .. toctree::
@@ -41,15 +13,14 @@ Contents:
 
    readme
    installation
+   usage
    contributing
    authors
    history
-
-   api/fields
-   api/models
 
 Indices and tables
 ==================
 
 * :ref:`genindex`
 * :ref:`modindex`
+* :ref:`search`
