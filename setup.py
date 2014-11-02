@@ -37,9 +37,12 @@ class PyTest(TestCommand):
         errcode = pytest.main(self.test_args)
         sys.exit(errcode)
 
-requirements = [
-    'six', 'ordereddict'
-]
+requirements = ['six']
+
+try:
+    from collections import OrderedDict
+except ImportError:
+    requirements.append('ordereddict')
 
 test_requirements = [
     'pytest'
