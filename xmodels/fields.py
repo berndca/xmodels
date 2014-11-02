@@ -62,8 +62,8 @@ class BaseField(CommonEqualityMixin):
 
     :param bool kwargs['required']: indicates required field
     :param str kwargs['default']: default value, used when raw_data is None
-    :param str kwargs['serial_format']: format string for serialization and
-    deserialization
+    :param str kwargs['serial_format']: format string for serialization and \
+deserialization
     :param str kwargs['source']: field name for serialized version
     """
     serial_format = None
@@ -744,9 +744,6 @@ class ModelField(WrappedObjectField):
             first_item = xmodels.CharField()
             second_item = xmodels.ModelField(MyNestedModel)
 
-    Then you can access the data as follows::
-
-
     """
 
     def __init__(self, wrapped_class, **kwargs):
@@ -859,8 +856,6 @@ class FieldCollectionField(BaseField):
     :class:`~xmodels.DateField`.
 
     Let's check out the resulting :class:`~xmodels.Model` instance with the
-    REPL::
-
 
     """
     def __init__(self, field_instance, **kwargs):

@@ -190,13 +190,13 @@ class ModelType(type):
 
 
 class Model(with_metaclass(ModelType)):
-    """The Model is the main component of xmodels.model. It is the base class
+    """The Model is the main component of xmodels.models. It is the base class
     for AttributeModel and SequenceModel implementing common logic.
 
     Usually one defines a number of fields as class variables. Fields may have
     default values. All fields can be assigned and read. A read to a field
     which has not been set previously return the default value if one exists or
-     None. The validate method validates all fields defined as class variables.
+    None. The validate method validates all fields defined as class variables.
 
     Instance variables may be created in addition to the fields specified as
     class variables if Meta.allow_extra_elements is True. Otherwise the

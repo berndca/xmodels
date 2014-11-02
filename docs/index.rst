@@ -3,20 +3,25 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to Python Boilerplate's documentation!
-======================================
+Welcome to Python xmodel's documentation!
+=========================================
+
+.. include:: ../README.rst
 
 Contents:
 
 .. toctree::
    :maxdepth: 2
 
-   readme
    installation
    usage
    contributing
    authors
    history
+
+   api/fields
+   api/models
+
 
 Indices and tables
 ==================

@@ -3,7 +3,6 @@ Fields
 
 .. automodule:: xmodels.fields
 .. autoclass:: xmodels.fields.BaseField
-.. autoclass:: xmodels.fields.Attribute
 .. autoclass:: xmodels.fields.RegexField
 .. autoclass:: xmodels.fields.RangeField
 
